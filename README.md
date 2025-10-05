@@ -1,4 +1,3 @@
-
 # 254Carbon Infrastructure (`254carbon-infra`)
 
 > Infrastructure-as-Code (IaC) and environment orchestration for the 254Carbon platform.  
