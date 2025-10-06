@@ -1,0 +1,51 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Generated manifests
+manifests/.cache/
+manifests/generated/
+
+# Secrets (never commit)
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Backup files
+backups/*.sql
+backups/*.dump
+backups/*.tar.gz
+backups/*.backup
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/

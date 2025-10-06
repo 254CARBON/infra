@@ -1,0 +1,41 @@
+# 254Carbon Cluster Configuration
+# Base configuration for local k3d cluster
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-config
+  namespace: kube-system
+data:
+  cluster_name: "local-254carbon"
+  environment: "local"
+  region: "local-a"
+
+  # Node configuration
+  node_labels: |
+    arch=amd64,arm64
+    role=core,ml,general
+    accelerator=gpu
+    zone=local-a
+
+  # Storage configuration
+  storage_classes: |
+    fast-local: hostPath
+    standard-local: local-path
+    backup-storage: minio
+
+  # Network configuration
+  ingress_class: "nginx"
+  ingress_domain: "local.254carbon"
+
+  # Observability configuration
+  metrics_retention: "15d"
+  log_retention: "7d"
+
+  # Security configuration
+  pod_security_profile: "restricted"
+  network_policy_default: "deny"
+
+  # Backup configuration
+  backup_schedule: "0 2 * * *"  # Daily at 2 AM
+  backup_retention_days: "30"

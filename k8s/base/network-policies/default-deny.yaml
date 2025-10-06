@@ -1,0 +1,97 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: platform-core
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: data-plane
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ml
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: security
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: backup
+  labels:
+    app.kubernetes.io/name: default-deny-all
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress

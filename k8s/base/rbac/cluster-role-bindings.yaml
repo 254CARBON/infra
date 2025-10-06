@@ -1,0 +1,31 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: 254carbon-platform-reader-binding
+  labels:
+    app.kubernetes.io/name: platform-reader-binding
+    app.kubernetes.io/part-of: "254carbon"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: 254carbon-platform-reader
+subjects:
+- kind: ServiceAccount
+  name: platform-reader
+  namespace: platform-core
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: 254carbon-backup-manager-binding
+  labels:
+    app.kubernetes.io/name: backup-manager-binding
+    app.kubernetes.io/part-of: "254carbon"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: 254carbon-backup-manager
+subjects:
+- kind: ServiceAccount
+  name: backup-manager
+  namespace: backup

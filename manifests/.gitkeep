@@ -1,0 +1,3 @@
+# Generated manifests directory
+# This directory contains compiled/generated Kubernetes manifests
+# Use for static manifests or as a drop zone for generated configs

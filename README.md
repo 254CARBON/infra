@@ -5,36 +5,58 @@
 
 ---
 
+## Quick Start
+
+```bash
+# 1. Bootstrap kind multi-node cluster
+make kind-up
+
+# 2. Apply base (namespaces, RBAC, policies)
+make k8s-apply-base
+
+# 3. Deploy data + platform dependencies
+make k8s-apply-platform
+
+# 4. Verify critical services
+make verify
+
+# 5. Tear down (clean)
+make kind-down
+```
+
+---
+
 ## Table of Contents
-1. Vision & Principles  
-2. Scope & Non‑Scope  
-3. Architecture Overview  
-4. Repository Structure  
-5. Environments & Promotion Model  
-6. Local Cluster (3‑Node Hybrid)  
-7. Kubernetes Layout & Namespaces  
-8. Core Platform Components  
-9. Terraform Module Design  
-10. GitOps & Deployment Flow  
-11. Secrets & Configuration Management  
-12. Networking & Ingress Topology  
-13. Storage, Persistence & Data Classes  
-14. Backup & Restore Strategy  
-15. Observability Integration (Metrics, Logs, Traces)  
-16. Security & Policy Enforcement  
-17. Multi‑Arch & Heterogeneous Scheduling  
-18. Resource Naming & Tagging Conventions  
-19. Automation Scripts & Make Targets  
-20. CI/CD Pipeline (Infra Changes)  
-21. Drift Detection & Guard Rails  
-22. Disaster Recovery & Resilience (Roadmap)  
-23. Cost / Resource Footprint Awareness (Even Locally)  
-24. Future Cloud Migration Blueprint  
-25. Contribution Workflow  
-26. Troubleshooting Matrix  
-27. Roadmap  
-28. Changelog Template  
-29. License / Ownership  
+- [Quick Start](#quick-start)
+- [1. Vision & Principles](#1-vision--principles)
+- [2. Scope & Non-Scope](#2-scope--non-scope)
+- [3. Architecture Overview](#3-architecture-overview)
+- [4. Repository Structure](#4-repository-structure)
+- [5. Environments & Promotion Model](#5-environments--promotion-model)
+- [6. Local Cluster (3-Node Hybrid)](#6-local-cluster-3-node-hybrid)
+- [7. Kubernetes Layout & Namespaces](#7-kubernetes-layout--namespaces)
+- [8. Core Platform Components](#8-core-platform-components)
+- [9. Terraform Module Design](#9-terraform-module-design)
+- [10. GitOps & Deployment Flow](#10-gitops--deployment-flow)
+- [11. Secrets & Configuration Management](#11-secrets--configuration-management)
+- [12. Networking & Ingress Topology](#12-networking--ingress-topology)
+- [13. Storage, Persistence & Data Classes](#13-storage-persistence--data-classes)
+- [14. Backup & Restore Strategy](#14-backup--restore-strategy)
+- [15. Observability Integration (Metrics, Logs, Traces)](#15-observability-integration-metrics-logs-traces)
+- [16. Security & Policy Enforcement](#16-security--policy-enforcement)
+- [17. Multi-Arch & Heterogeneous Scheduling](#17-multi-arch--heterogeneous-scheduling)
+- [18. Resource Naming & Tagging Conventions](#18-resource-naming--tagging-conventions)
+- [19. Automation Scripts & Make Targets](#19-automation-scripts--make-targets)
+- [20. CI/CD Pipeline (Infra Changes)](#20-cicd-pipeline-infra-changes)
+- [21. Drift Detection & Guard Rails](#21-drift-detection--guard-rails)
+- [22. Disaster Recovery & Resilience (Roadmap)](#22-disaster-recovery--resilience-roadmap)
+- [23. Cost / Resource Footprint Awareness (Local)](#23-cost--resource-footprint-awareness-local)
+- [24. Future Cloud Migration Blueprint](#24-future-cloud-migration-blueprint)
+- [25. Contribution Workflow](#25-contribution-workflow)
+- [26. Troubleshooting Matrix](#26-troubleshooting-matrix)
+- [27. Roadmap](#27-roadmap)
+- [28. Changelog Template](#28-changelog-template)
+- [29. License / Ownership](#29-license--ownership)
 
 ---
 
@@ -53,7 +75,7 @@
 
 ---
 
-## 2. Scope & Non‑Scope
+## 2. Scope & Non-Scope
 
 ### In Scope
 - Terraform scaffolding (even if local execution is partial).
@@ -76,7 +98,7 @@
 
 Logical Layers:
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │ Access Layer (Ingress / Gateway / Streaming)│
 ├─────────────────────────────────────────────┤
@@ -97,7 +119,7 @@ Logical Layers:
 
 ## 4. Repository Structure
 
-```
+```text
 /
   terraform/
     modules/
@@ -179,21 +201,18 @@ Logical Layers:
 | staging (future) | Pre‑prod validation | Real K8s | dev after drift-free |
 | prod (future) | Mission operation | Multi-region | staging after SLO stable |
 
-Local uses ephemeral ephemeral storage (hostPath or local-path provisioner). Staging/prod will migrate to network-attached or SSD-backed PV classes.
+Local uses ephemeral storage (hostPath or local-path provisioner). Staging/prod will migrate to network-attached or SSD-backed PV classes.
 
 ---
 
-## 6. Local Cluster (3‑Node Hybrid)
+## 6. Local Cluster (3-Node Hybrid)
 
 Nodes:
 1. Linux x86_64 (control-plane + data services affinity).
 2. macOS ARM #1 (GPU candidate, label: `arch=arm64, accelerator=gpu, role=ml`).
 3. macOS ARM #2 (general ARM workloads, label: `arch=arm64, role=general`).
 
-Node Labeling Script:
-```
-scripts/label_nodes.sh
-```
+Node Labeling Script: `scripts/label_nodes.sh`
 
 Example Labels Applied:
 | Label | Value |
@@ -248,7 +267,7 @@ Network Policies: Default deny east-west except required ports & explicit allowa
 
 Even for local, modules mimic cloud patterns:
 
-```
+```text
 terraform/modules/
   k8s_cluster/          # (future: EKS/GKE variant)
   clickhouse/
@@ -265,7 +284,7 @@ terraform/modules/
 ```
 
 Module Interface Example (clickhouse):
-```
+```hcl
 variable "namespace" { type = string }
 variable "storage_size" { type = string default = "50Gi" }
 variable "replicas" { type = number default = 1 }
@@ -303,10 +322,7 @@ Suggested Transition:
 | External Secrets (future) | Cloud secret managers | Offloads rotation |
 | Static configMaps | Non-sensitive configs | Mount as read-only |
 
-Secret Rotation Script:
-```
-scripts/rotate_secrets.sh
-```
+Secret Rotation Script: `scripts/rotate_secrets.sh`
 
 Never commit raw credentials; provide `*.example` templates for required secrets.
 
@@ -357,7 +373,7 @@ Data tier classification:
 | MLflow Artifacts | Covered by MinIO | N/A | Same policy |
 
 Restore Steps (Example ClickHouse):
-```
+```bash
 kubectl exec -it clickhouse-0 -- clickhouse-backup list
 kubectl exec -it clickhouse-0 -- clickhouse-backup restore latest
 ```
@@ -369,7 +385,7 @@ Retention Policy:
 
 ---
 
-## 15. Observability Integration
+## 15. Observability Integration (Metrics, Logs, Traces)
 
 | Layer | Tool | Notes |
 |-------|------|-------|
@@ -406,10 +422,10 @@ Future Additions:
 
 ---
 
-## 17. Multi‑Arch & Heterogeneous Scheduling
+## 17. Multi-Arch & Heterogeneous Scheduling
 
 Node Affinity Example (ML Pods → GPU ARM Mac):
-```
+```yaml
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -424,7 +440,7 @@ affinity:
 ```
 
 Tolerations:
-```
+```yaml
 tolerations:
   - key: "role"
     operator: "Equal"
@@ -438,10 +454,10 @@ Images:
 
 ---
 
-## 18. Resource Naming & Tagging
+## 18. Resource Naming & Tagging Conventions
 
 Naming Convention:
-```
+```text
 <system>-<component>-<role>-<suffix>
 ```
 Examples:
@@ -513,7 +529,7 @@ Tools:
 - Alert on drift (issue auto-created in infra repo)
 
 Example OPA Policy (pseudocode):
-```
+```rego
 deny[msg] {
   input.kind == "Pod"
   input.spec.containers[_].securityContext.privileged == true
@@ -577,7 +593,7 @@ Resource Classes:
 1. Create feature branch.
 2. Change infra module / k8s overlays / policies.
 3. Run local validation:
-   ```
+   ```bash
    make validate
    make plan   # (Terraform plan)
    make k8s-dry-run
@@ -624,7 +640,7 @@ Commit Message Examples:
 
 ## 28. Changelog Template
 
-```
+```markdown
 ## [1.2.0] - 2025-10-08
 ### Added
 - clickhouse: TTL for raw ticks (90d)
@@ -654,45 +670,4 @@ Commit Message Examples:
 
 ---
 
-## Quick Start
-
-```bash
-# 1. Bootstrap kind multi-node cluster
-make kind-up
-
-# 2. Apply base (namespaces, RBAC, policies)
-make k8s-apply-base
-
-# 3. Deploy data + platform dependencies
-make k8s-apply-platform
-
-# 4. Verify critical services
-make verify
-
-# 5. Tear down (clean)
-make kind-down
-```
-
----
-
-## Make Targets (Suggested)
-
-| Target | Description |
-|--------|-------------|
-| make kind-up | Create local multi-node cluster |
-| make kind-down | Destroy cluster |
-| make validate | Terraform + kustomize + policy validation |
-| make plan | Show terraform plan (local stack) |
-| make apply | Apply terraform local stack |
-| make k8s-apply-base | Apply base K8s manifests |
-| make k8s-apply-platform | Deploy stateful + platform services |
-| make backup-run | Manual trigger backup jobs |
-| make verify | Run scripts/verify.sh |
-| make drift-check | Detect unmanaged changes |
-| make clean | Remove temp artifacts |
-
----
-
 > “Infrastructure should feel like a stable substrate: **predictable**, **observable**, and **quiet**—empowering rapid iteration above it.”
-
----

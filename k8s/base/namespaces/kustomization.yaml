@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - platform-core.yaml
+  - data-plane.yaml
+  - storage.yaml
+  - ml.yaml
+  - ingestion.yaml
+  - observability.yaml
+  - security.yaml
+  - backup.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: "254carbon"
+      app.kubernetes.io/managed-by: "kustomize"

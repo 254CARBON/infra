@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingestion
+  labels:
+    app.kubernetes.io/name: ingestion
+    app.kubernetes.io/part-of: "254carbon"
+    tier: platform
+    domain: ingestion
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ingestion-quota
+  namespace: ingestion
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "5"
+    pods: "15"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ingestion-limits
+  namespace: ingestion
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container

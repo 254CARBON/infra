@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: data-plane
+
+resources:
+  - clickhouse.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: clickhouse
+      app.kubernetes.io/part-of: "254carbon"
+      tier: data
+      domain: analytics
+
+patches:
+  - path: clickhouse-patch.yaml
+    target:
+      kind: StatefulSet
+      name: clickhouse

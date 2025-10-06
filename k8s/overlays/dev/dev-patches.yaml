@@ -1,0 +1,40 @@
+# Dev environment patches
+# Adjustments for development cluster
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  namespace: data-plane
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: clickhouse
+        resources:
+          requests:
+            cpu: 1
+            memory: 2Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: data-plane
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: postgresql
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1
+            memory: 2Gi

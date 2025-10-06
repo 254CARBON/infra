@@ -1,0 +1,69 @@
+# Agent context for 254Carbon Infrastructure
+# This file provides context about the infrastructure setup and conventions
+
+project:
+  name: "254Carbon Infrastructure"
+  description: "Infrastructure-as-Code for 254Carbon platform"
+  version: "0.1.0"
+
+infrastructure:
+  local_cluster:
+    tool: "k3d"
+    cluster_name: "local-254carbon"
+    nodes:
+      - type: "server"
+        count: 1
+      - type: "agent"
+        count: 2
+
+  environments:
+    - name: "local"
+      purpose: "Development and experimentation"
+      cluster: "k3d"
+    - name: "dev"
+      purpose: "Shared integration testing"
+      cluster: "managed-k8s"
+    - name: "staging"
+      purpose: "Pre-production validation"
+      cluster: "managed-k8s"
+    - name: "prod"
+      purpose: "Production operations"
+      cluster: "multi-region"
+
+components:
+  data_services:
+    - "postgresql"
+    - "clickhouse"
+    - "redis"
+    - "kafka"
+    - "minio"
+
+  platform_services:
+    - "keycloak"
+    - "mlflow"
+    - "otel-collector"
+    - "prometheus-stack"
+
+conventions:
+  naming:
+    pattern: "<system>-<component>-<role>-<suffix>"
+    examples:
+      - "mi-clickhouse-sts"
+      - "mi-postgres-pvc"
+      - "ml-embedding-deploy"
+
+  labels:
+    app: "Component identity"
+    tier: "Layer classification (data/platform/access)"
+    domain: "Domain grouping (ml/ingestion/observability)"
+    managed-by: "Provisioning tool (terraform/helm/kustomize)"
+    version: "Release tracking"
+
+security:
+  policies:
+    - "deny-excess-privileges"
+    - "restrict-hostpath"
+
+  profiles:
+    default: "restricted"
+    exceptions: "system components only"

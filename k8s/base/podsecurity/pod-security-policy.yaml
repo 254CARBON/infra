@@ -1,0 +1,8 @@
+# Pod Security Policy Labels
+# These labels should be applied to namespaces to enforce pod security standards
+# Note: Namespaces are defined in the namespaces/ directory to avoid conflicts
+
+# Example of how to apply pod security labels to existing namespaces:
+# kubectl label namespace platform-core pod-security.kubernetes.io/enforce=restricted
+# kubectl label namespace platform-core pod-security.kubernetes.io/audit=restricted
+# kubectl label namespace platform-core pod-security.kubernetes.io/warn=restricted

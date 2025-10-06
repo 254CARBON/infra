@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - ../../platform/clickhouse
+  - ../../platform/postgresql
+  - ../../platform/redis
+  - ../../platform/kafka
+  - ../../platform/minio
+  - ../../platform/keycloak
+  - ../../platform/mlflow
+  - ../../platform/metrics-stack
+  - ../../platform/otel
+  - ../../platform/backup-jobs
+
+labels:
+  - pairs:
+      environment: dev
+      app.kubernetes.io/part-of: "254carbon"
+      app.kubernetes.io/managed-by: "kustomize"
+
+patches:
+  - path: dev-patches.yaml

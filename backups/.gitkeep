@@ -1,0 +1,3 @@
+# Backups metadata directory
+# This directory contains backup metadata, not actual backup files
+# Actual backup files are stored in persistent volumes or external storage

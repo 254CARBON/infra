@@ -1,0 +1,59 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: local-254carbon
+servers: 1
+agents: 2
+kubeAPI:
+  host: 0.0.0.0
+  hostPort: 6443
+ports:
+  - port: 80:80@loadbalancer
+  - port: 443:443@loadbalancer
+  - port: 3000:3000@loadbalancer  # Grafana
+  - port: 8080:8080@loadbalancer  # Keycloak
+  - port: 5000:5000@loadbalancer  # MLflow
+  - port: 9000:9000@loadbalancer  # MinIO
+options:
+  k3d:
+    wait: true
+    timeout: 300s
+  k3s:
+    extraArgs:
+      - arg: "--disable=traefik"
+        nodeFilters:
+          - server:*
+      - arg: "--disable=servicelb"
+        nodeFilters:
+          - server:*
+      - arg: "--disable=local-storage"
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
+registries:
+  create:
+    name: k3d-254carbon-registry
+    host: 0.0.0.0
+    hostPort: "5000"
+  use:
+    - k3d-254carbon-registry:5000
+    - registry.k8s.io
+    - docker.io
+    - quay.io
+    - ghcr.io
+volumes:
+  - volume: /var/lib/rancher/k3s/storage@server:0
+    nodeFilters:
+      - server:0
+  - volume: /var/lib/rancher/k3s/storage@agent:0
+    nodeFilters:
+      - agent:0
+  - volume: /var/lib/rancher/k3s/storage@agent:1
+    nodeFilters:
+      - agent:1
+env:
+  - envVar: K3S_KUBECONFIG_OUTPUT=/tmp/kubeconfig
+    nodeFilters:
+      - server:0

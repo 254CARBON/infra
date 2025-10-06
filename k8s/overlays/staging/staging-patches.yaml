@@ -1,0 +1,40 @@
+# Staging environment patches
+# Adjustments for staging cluster (future)
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  namespace: data-plane
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: clickhouse
+        resources:
+          requests:
+            cpu: 2
+            memory: 4Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: data-plane
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: postgresql
+        resources:
+          requests:
+            cpu: 1
+            memory: 2Gi
+          limits:
+            cpu: 2
+            memory: 4Gi

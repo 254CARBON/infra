@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard-local
+  labels:
+    app.kubernetes.io/name: standard-local
+    app.kubernetes.io/part-of: "254carbon"
+provisioner: k3d.io/hostpath
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  path: "/var/lib/rancher/k3s/storage"

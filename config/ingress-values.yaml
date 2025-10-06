@@ -1,0 +1,77 @@
+# NGINX Ingress Controller Values for 254Carbon
+# Configuration for local k3d cluster
+
+controller:
+  # Resource limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Service configuration
+  service:
+    type: LoadBalancer
+    ports:
+      http: 80
+      https: 443
+
+  # Ingress class
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: true
+
+  # Config for local development
+  config:
+    # Disable redirect to HTTPS for local development
+    ssl-redirect: "false"
+
+    # Enable access logs
+    access-log-path: "/var/log/nginx/access.log"
+    error-log-path: "/var/log/nginx/error.log"
+
+    # Proxy settings
+    proxy-body-size: "100m"
+    proxy-read-timeout: "300"
+    proxy-send-timeout: "300"
+
+    # Rate limiting
+    rate-limit: "100"
+    rate-limit-window: "1m"
+
+# Default backend
+defaultBackend:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 20Mi
+    limits:
+      cpu: 20m
+      memory: 40Mi
+
+# Metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: observability
+    labels:
+      app: nginx-ingress
+
+# Prometheus rules
+prometheusRule:
+  enabled: true
+  namespace: observability
+  rules:
+    - alert: NginxIngressDown
+      expr: up{job="nginx-ingress-controller"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Nginx Ingress Controller is down"

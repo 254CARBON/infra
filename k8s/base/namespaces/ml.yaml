@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml
+  labels:
+    app.kubernetes.io/name: ml
+    app.kubernetes.io/part-of: "254carbon"
+    tier: platform
+    domain: ml
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ml-quota
+  namespace: ml
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    persistentvolumeclaims: "10"
+    pods: "20"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ml-limits
+  namespace: ml
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "200m"
+      memory: "256Mi"
+    type: Container
