@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infra-environments
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - environment: dev
+            overlayPath: k8s/overlays/dev
+          - environment: staging
+            overlayPath: k8s/overlays/staging
+  template:
+    metadata:
+      name: infra-{{environment}}
+      namespace: argocd
+      labels:
+        environment: "{{environment}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/254CARBON/infra.git
+        targetRevision: HEAD
+        path: '{{overlayPath}}'
+        directory:
+          recurse: true
+      destination:
+        server: https://kubernetes.default.svc
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -23,6 +23,8 @@ secrets/
 *.crt
 *.p12
 *.pfx
+*.agekey
+!examples/sops/demo.agekey
 
 # Backup files
 backups/*.sql

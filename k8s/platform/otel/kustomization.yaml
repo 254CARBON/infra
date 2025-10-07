@@ -5,6 +5,7 @@ namespace: observability
 
 resources:
   - otel-collector.yaml
+  - collector-config.yaml
 
 labels:
   - pairs:

@@ -50,6 +50,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 70
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 40
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: minio
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: minio
         image: minio/minio:latest
@@ -70,28 +95,40 @@ spec:
             secretKeyRef:
               name: minio-credentials
               key: secret-key
+        - name: MINIO_PROMETHEUS_AUTH_TYPE
+          value: "public"
         volumeMounts:
         - name: minio-storage
           mountPath: /data
         resources:
           requests:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 600m
+            memory: 768Mi
           limits:
-            cpu: 1
-            memory: 1Gi
+            cpu: 1500m
+            memory: 2Gi
+        startupProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          failureThreshold: 30
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /minio/health/live
             port: 9000
-          initialDelaySeconds: 30
+          initialDelaySeconds: 45
           periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /minio/health/ready
             port: 9000
-          initialDelaySeconds: 5
+          initialDelaySeconds: 15
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
       volumes:
       - name: minio-storage
         persistentVolumeClaim:

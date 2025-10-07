@@ -1,40 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Node Labeling Script for 254Carbon k3d Cluster
+# Node Labeling Script for 254Carbon kind/k3d clusters
 # Applies labels for heterogeneous scheduling (ARM + AMD64)
 
-echo "🏷️  Labeling k3d cluster nodes..."
+CONTEXT=${1:-}
+if [ -n "${CONTEXT}" ]; then
+    KUBECTL=(kubectl --context "${CONTEXT}")
+else
+    KUBECTL=(kubectl)
+fi
 
-# Get all nodes
-NODES=$(kubectl get nodes -o name | sed 's/node\///')
+echo "🏷️  Labeling cluster nodes..."
 
-for node in $NODES; do
-    echo "Labeling node: $node"
+# Gather nodes in deterministic order for consistent role assignment
+mapfile -t NODES < <("${KUBECTL[@]}" get nodes -o name | sed 's#node/##' | sort)
 
-    # Get node info to determine architecture
-    ARCH=$(kubectl get node "$node" -o jsonpath='{.status.nodeInfo.architecture}')
+WORKER_INDEX=0
+for node in "${NODES[@]}"; do
+    echo "Labeling node: ${node}"
 
-    # Apply architecture label
-    kubectl label node "$node" arch="$ARCH" --overwrite
+    ARCH=$("${KUBECTL[@]}" get node "${node}" -o jsonpath='{.status.nodeInfo.architecture}')
+    "${KUBECTL[@]}" label node "${node}" arch="${ARCH}" --overwrite
+    "${KUBECTL[@]}" label node "${node}" zone="local-a" --overwrite
 
-    # Apply zone label (all local for now)
-    kubectl label node "$node" zone="local-a" --overwrite
-
-    # Determine role based on node name/position
-    if [[ "$node" == *"server"* ]] || [[ "$node" == *"master"* ]]; then
-        kubectl label node "$node" role="core" --overwrite
-    elif [[ "$node" == *"agent-0"* ]]; then
-        # First agent: GPU candidate (ARM Mac)
-        kubectl label node "$node" role="ml" accelerator="gpu" --overwrite
+    if [[ "${node}" == *"server"* ]] || [[ "${node}" == *"master"* ]] || [[ "${node}" == *"control-plane"* ]]; then
+        "${KUBECTL[@]}" label node "${node}" role="core" --overwrite
+        "${KUBECTL[@]}" label node "${node}" accelerator- >/dev/null 2>&1 || true
     else
-        # Other agents: general purpose
-        kubectl label node "$node" role="general" --overwrite
+        if [ "${WORKER_INDEX}" -eq 0 ]; then
+            "${KUBECTL[@]}" label node "${node}" role="ml" accelerator="gpu" --overwrite
+        else
+            "${KUBECTL[@]}" label node "${node}" role="general" --overwrite
+            "${KUBECTL[@]}" label node "${node}" accelerator- >/dev/null 2>&1 || true
+        fi
+        WORKER_INDEX=$((WORKER_INDEX + 1))
     fi
 
-    echo "✅ Labeled $node: arch=$ARCH, role=$(kubectl get node "$node" -o jsonpath='{.metadata.labels.role}')"
+    ROLE=$("${KUBECTL[@]}" get node "${node}" -o jsonpath='{.metadata.labels.role}')
+    echo "✅ ${node}: arch=${ARCH}, role=${ROLE}"
 done
 
 echo "🎉 Node labeling complete!"
 echo "📋 Current node labels:"
-kubectl get nodes --show-labels
+"${KUBECTL[@]}" get nodes --show-labels

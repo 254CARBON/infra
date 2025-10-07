@@ -49,6 +49,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 999
         fsGroup: 999
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 80
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 60
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: postgresql
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: postgresql
         image: postgres:15
@@ -71,11 +96,21 @@ spec:
           mountPath: /var/lib/postgresql/data
         resources:
           requests:
-            cpu: 500m
-            memory: 1Gi
+            cpu: 750m
+            memory: 1.5Gi
           limits:
-            cpu: 1
-            memory: 2Gi
+            cpu: 1500m
+            memory: 3Gi
+        startupProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+            - -d
+            - 254carbon
+          failureThreshold: 18
+          periodSeconds: 10
         livenessProbe:
           exec:
             command:
@@ -84,8 +119,10 @@ spec:
             - postgres
             - -d
             - 254carbon
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 5
         readinessProbe:
           exec:
             command:
@@ -94,8 +131,54 @@ spec:
             - postgres
             - -d
             - 254carbon
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      - name: postgres-exporter
+        image: quay.io/prometheuscommunity/postgres-exporter:v0.14.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 9187
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+        env:
+        - name: DATA_SOURCE_URI
+          value: "postgresql://localhost:5432/254carbon?sslmode=disable"
+        - name: DATA_SOURCE_USER
+          value: "postgres"
+        - name: DATA_SOURCE_PASS
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 20
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
       volumes:
       - name: postgres-storage
         persistentVolumeClaim:
@@ -116,4 +199,7 @@ spec:
   - name: postgres
     port: 5432
     targetPort: 5432
+  - name: metrics
+    port: 9187
+    targetPort: 9187
   type: ClusterIP

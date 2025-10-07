@@ -5,6 +5,7 @@ namespace: platform-core
 
 resources:
   - keycloak.yaml
+  - keycloak-ingress.yaml
 
 labels:
   - pairs:

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Backup and restore scripts
 
 ### Changed
+- StorageClasses now target the `rancher.io/local-path` provisioner and use `WaitForFirstConsumer` for compatibility with both kind and k3d
 
 ### Fixed
 

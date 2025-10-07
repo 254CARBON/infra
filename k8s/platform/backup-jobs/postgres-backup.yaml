@@ -7,9 +7,13 @@ metadata:
     app.kubernetes.io/name: postgres-backup
     app.kubernetes.io/part-of: "254carbon"
 spec:
-  schedule: "0 3 * * *"  # Daily at 3 AM
+  schedule: "0 3 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
+      backoffLimit: 1
       template:
         metadata:
           labels:
@@ -18,55 +22,93 @@ spec:
         spec:
           securityContext:
             runAsNonRoot: true
-            runAsUser: 1000
-            fsGroup: 1000
+            runAsUser: 1001
+            fsGroup: 1001
           containers:
           - name: postgres-backup
-            image: postgres:15
+            image: bitnami/postgresql:15
             imagePullPolicy: IfNotPresent
             command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
-              echo "Starting PostgreSQL backup..."
-              pg_dump -h postgresql.data-plane.svc.cluster.local -U postgres -d 254carbon > /backup/postgres-$(date +%Y%m%d-%H%M%S).sql
-              echo "Backup completed"
+              set -eu
+
+              timestamp="$(date +%Y%m%d-%H%M%S)"
+              day_of_month="$(date +%d)"
+              day_of_week="$(date +%u)"
+
+              if [ "${day_of_month}" = "01" ]; then
+                tier="monthly"
+              elif [ "${day_of_week}" = "7" ]; then
+                tier="weekly"
+              else
+                tier="daily"
+              fi
+
+              backup_filename="postgres-${tier}-${timestamp}.sql.gz"
+              backup_path="/tmp/${backup_filename}"
+
+              scratch_dir="$(mktemp -d)"
+              cleanup() {
+                rm -f "${backup_path}" || true
+                rm -rf "${scratch_dir}" || true
+              }
+              trap cleanup EXIT
+
+              export PGPASSWORD="${POSTGRES_PASSWORD}"
+              pg_dump -h "${POSTGRES_HOST}" -p "${POSTGRES_PORT}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --format=p | gzip > "${backup_path}"
+
+              curl -fsSL "${MC_DOWNLOAD_URL}" -o "${scratch_dir}/mc"
+              chmod +x "${scratch_dir}/mc"
+
+              "${scratch_dir}/mc" alias set backup "${S3_ENDPOINT}" "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}" --api s3v4
+              "${scratch_dir}/mc" mb --ignore-existing "backup/${S3_BUCKET}"
+              "${scratch_dir}/mc" cp "${backup_path}" "backup/${S3_BUCKET}/${S3_PREFIX}/${tier}/${backup_filename}"
+              echo "PostgreSQL backup ${backup_filename} uploaded to MinIO"
             env:
-            - name: PGPASSWORD
+            - name: POSTGRES_HOST
+              value: "postgresql.data-plane.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-credentials
+                  name: postgres-backup-credentials
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-backup-credentials
                   key: password
-            volumeMounts:
-            - name: backup-storage
-              mountPath: /backup
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-backup-credentials
+                  key: database
+            - name: MC_DOWNLOAD_URL
+              value: "https://dl.min.io/client/mc/release/linux-amd64/mc"
+            - name: S3_ENDPOINT
+              value: "http://minio.storage.svc.cluster.local:9000"
+            - name: S3_BUCKET
+              value: "backups"
+            - name: S3_PREFIX
+              value: "postgres"
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backup-credentials
+                  key: access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backup-credentials
+                  key: secret-key
             resources:
               requests:
-                cpu: 100m
-                memory: 128Mi
+                cpu: 200m
+                memory: 256Mi
               limits:
-                cpu: 500m
-                memory: 512Mi
-          volumes:
-          - name: backup-storage
-            persistentVolumeClaim:
-              claimName: backup-storage
+                cpu: 1000m
+                memory: 1Gi
           restartPolicy: OnFailure
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: backup-storage
-  namespace: backup
-  labels:
-    app.kubernetes.io/name: backup-storage
-    app.kubernetes.io/part-of: "254carbon"
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: backup-storage

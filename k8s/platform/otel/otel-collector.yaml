@@ -21,10 +21,37 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 40
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 20
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: otel-collector
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: otel-collector
         image: otel/opentelemetry-collector-contrib:latest
         imagePullPolicy: IfNotPresent
+        args:
+        - --config=/etc/otel-collector/collector.yaml
         ports:
         - name: otlp
           containerPort: 4317
@@ -36,25 +63,47 @@ spec:
           containerPort: 14268
         - name: zipkin
           containerPort: 9411
+        - name: metrics
+          containerPort: 9464
+        - name: status
+          containerPort: 13133
         resources:
           requests:
-            cpu: 250m
-            memory: 256Mi
+            cpu: 300m
+            memory: 384Mi
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 600m
+            memory: 768Mi
+        startupProbe:
+          httpGet:
+            path: /
+            port: 13133
+          failureThreshold: 24
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /
             port: 13133
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 35
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 4
         readinessProbe:
           httpGet:
             path: /
             port: 13133
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: otel-collector-config
+          mountPath: /etc/otel-collector
+          readOnly: true
+      volumes:
+      - name: otel-collector-config
+        configMap:
+          name: otel-collector-config
 ---
 apiVersion: v1
 kind: Service
@@ -83,4 +132,7 @@ spec:
   - name: zipkin
     port: 9411
     targetPort: 9411
+  - name: metrics
+    port: 9464
+    targetPort: 9464
   type: ClusterIP

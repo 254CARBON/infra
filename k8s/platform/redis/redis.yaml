@@ -33,6 +33,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 999
         fsGroup: 999
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 60
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 40
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: redis
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: redis
         image: redis:7-alpine
@@ -48,25 +73,78 @@ spec:
               key: password
         resources:
           requests:
-            cpu: 100m
+            cpu: 200m
             memory: 256Mi
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 600m
+            memory: 768Mi
+        startupProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          failureThreshold: 30
+          periodSeconds: 5
         livenessProbe:
           exec:
             command:
             - redis-cli
             - ping
-          initialDelaySeconds: 30
+          initialDelaySeconds: 20
           periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 5
         readinessProbe:
           exec:
             command:
             - redis-cli
             - ping
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.53.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 9121
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: password
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 150m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 5
 ---
 apiVersion: v1
 kind: Service
@@ -83,4 +161,7 @@ spec:
   - name: redis
     port: 6379
     targetPort: 6379
+  - name: metrics
+    port: 9121
+    targetPort: 9121
   type: ClusterIP

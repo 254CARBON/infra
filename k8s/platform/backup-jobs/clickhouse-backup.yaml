@@ -7,9 +7,13 @@ metadata:
     app.kubernetes.io/name: clickhouse-backup
     app.kubernetes.io/part-of: "254carbon"
 spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
+      backoffLimit: 1
       template:
         metadata:
           labels:
@@ -22,34 +26,97 @@ spec:
             fsGroup: 1000
           containers:
           - name: clickhouse-backup
-            image: clickhouse/clickhouse-server:latest
+            image: altinity/clickhouse-backup:2.6.4
             imagePullPolicy: IfNotPresent
             command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
-              echo "Starting ClickHouse backup..."
-              clickhouse-backup create manual-$(date +%Y%m%d-%H%M%S)
-              echo "Backup completed"
+              set -eu
+
+              timestamp="$(date +%Y%m%d-%H%M%S)"
+              day_of_month="$(date +%d)"
+              day_of_week="$(date +%u)"
+
+              if [ "${day_of_month}" = "01" ]; then
+                tier="monthly"
+              elif [ "${day_of_week}" = "7" ]; then
+                tier="weekly"
+              else
+                tier="daily"
+              fi
+
+              backup_name="${tier}-${timestamp}"
+              config_file="/tmp/clickhouse-backup.yaml"
+
+              cat <<EOF > "${config_file}"
+              general:
+                remote_storage: s3
+                disable_progress_bar: true
+                backups_to_keep_local: 1
+              clickhouse:
+                host: ${CLICKHOUSE_HOST}
+                port: ${CLICKHOUSE_PORT}
+                username: ${CLICKHOUSE_USER}
+                password: ${CLICKHOUSE_PASSWORD}
+                secure: false
+                skip_tables:
+                  - system.*
+              s3:
+                access_key: ${S3_ACCESS_KEY}
+                secret_key: ${S3_SECRET_KEY}
+                bucket: ${S3_BUCKET}
+                endpoint: ${S3_ENDPOINT}
+                region: ${S3_REGION}
+                disable_ssl: true
+                force_path_style: true
+                acl: private
+                path: ${S3_PREFIX}/${tier}
+              EOF
+
+              echo "Starting ClickHouse backup: ${backup_name}"
+              clickhouse-backup --config "${config_file}" create "${backup_name}"
+              clickhouse-backup --config "${config_file}" upload "${backup_name}"
+              clickhouse-backup --config "${config_file}" delete local "${backup_name}"
+              echo "ClickHouse backup ${backup_name} uploaded to MinIO"
             env:
             - name: CLICKHOUSE_HOST
               value: "clickhouse.data-plane.svc.cluster.local"
             - name: CLICKHOUSE_PORT
               value: "9000"
             - name: CLICKHOUSE_USER
-              value: "default"
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-backup-credentials
+                  key: username
             - name: CLICKHOUSE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: clickhouse-credentials
+                  name: clickhouse-backup-credentials
                   key: password
+            - name: S3_ENDPOINT
+              value: "http://minio.storage.svc.cluster.local:9000"
+            - name: S3_REGION
+              value: "us-east-1"
+            - name: S3_BUCKET
+              value: "backups"
+            - name: S3_PREFIX
+              value: "clickhouse"
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backup-credentials
+                  key: access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backup-credentials
+                  key: secret-key
             resources:
               requests:
-                cpu: 100m
-                memory: 128Mi
-              limits:
-                cpu: 500m
+                cpu: 200m
                 memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
           restartPolicy: OnFailure
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1

@@ -20,9 +20,9 @@ data:
 
   # Storage configuration
   storage_classes: |
-    fast-local: hostPath
+    fast-local: local-path
     standard-local: local-path
-    backup-storage: minio
+    backup-storage: local-path
 
   # Network configuration
   ingress_class: "nginx"

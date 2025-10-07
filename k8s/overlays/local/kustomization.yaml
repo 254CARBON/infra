@@ -12,6 +12,7 @@ resources:
   - ../../platform/mlflow
   - ../../platform/metrics-stack
   - ../../platform/otel
+  - ../../platform/ingress-nginx
   - ../../platform/backup-jobs
 
 labels:

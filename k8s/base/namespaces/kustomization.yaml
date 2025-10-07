@@ -10,6 +10,7 @@ resources:
   - observability.yaml
   - security.yaml
   - backup.yaml
+  - ingress-nginx.yaml
 
 labels:
   - pairs:

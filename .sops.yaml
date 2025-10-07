@@ -1,0 +1,24 @@
+---
+# Default SOPS configuration for this repository.
+# See https://github.com/getsops/sops for configuration reference.
+creation_rules:
+  # Kubernetes secret manifests kept under repo-root `secrets/` or `k8s/**/secrets/`.
+  - path_regex: (secrets|k8s/.*/secrets)/.*\.(ya?ml|json)$
+    encrypted_regex: '^(data|stringData)$'
+    key_groups:
+      - age:
+          - age1l5nxpgp70sv00q4df42y4jmlf8qjuf7a9lr07q5esnasqnaywglq5z68av
+
+  # Terraform variable files that contain sensitive values.
+  - path_regex: terraform/.*\.tfvars(\.json)?$
+    encrypted_regex: '.*'
+    key_groups:
+      - age:
+          - age1l5nxpgp70sv00q4df42y4jmlf8qjuf7a9lr07q5esnasqnaywglq5z68av
+
+  # Example encrypted manifests that live alongside plaintext templates.
+  - path_regex: examples/sops/.*\.enc\.(ya?ml|json)$
+    encrypted_regex: '^(data|stringData|string_data|data_raw)$'
+    key_groups:
+      - age:
+          - age1l5nxpgp70sv00q4df42y4jmlf8qjuf7a9lr07q5esnasqnaywglq5z68av

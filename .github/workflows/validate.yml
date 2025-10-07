@@ -1,0 +1,79 @@
+name: Infrastructure Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  KUBECONFORM_VERSION: "0.7.0"
+  CONTFEST_VERSION: "0.63.0"
+  TERRAFORM_VERSION: "1.7.5"
+
+jobs:
+  validate:
+    name: Run Infrastructure Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Kubernetes configuration
+        run: |
+          mkdir -p "$HOME/.kube"
+          cat <<'EOF' > "$HOME/.kube/config"
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - name: stub
+            cluster:
+              server: https://example.invalid
+              insecure-skip-tls-verify: true
+          contexts:
+          - name: stub
+            context:
+              cluster: stub
+              user: stub
+          current-context: stub
+          users:
+          - name: stub
+            user:
+              token: dummytoken
+          EOF
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.32.2
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz kubeconform
+          sudo mv kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: Install Conftest
+        run: |
+          curl -sSL -o conftest.tar.gz "https://github.com/open-policy-agent/conftest/releases/download/v${CONTFEST_VERSION}/conftest_${CONTFEST_VERSION}_Linux_x86_64.tar.gz"
+          tar -xzf conftest.tar.gz conftest
+          sudo mv conftest /usr/local/bin/conftest
+          rm conftest.tar.gz
+          conftest --version
+
+      - name: Initialize Terraform modules
+        run: terraform -chdir=terraform/stacks/local init -input=false
+
+      - name: Validate infrastructure definitions
+        run: make validate

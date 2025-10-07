@@ -8,8 +8,8 @@
 ## Quick Start
 
 ```bash
-# 1. Bootstrap kind multi-node cluster
-make kind-up
+# 1. Bootstrap k3d multi-node cluster (default)
+make k3d-up
 
 # 2. Apply base (namespaces, RBAC, policies)
 make k8s-apply-base
@@ -21,8 +21,18 @@ make k8s-apply-platform
 make verify
 
 # 5. Tear down (clean)
+make k3d-down
+```
+
+Prefer kind for local testing? Swap the bootstrap/teardown commands:
+
+```bash
+make kind-up
+# ...
 make kind-down
 ```
+
+Or reuse the aggregated targets with `CLUSTER_PROVIDER=kind make cluster-up` and `CLUSTER_PROVIDER=kind make cluster-down`.
 
 ---
 
@@ -165,6 +175,7 @@ Logical Layers:
   helm/ (optional umbrella or value overrides)
   scripts/
     kind_bootstrap.sh
+    k3d_bootstrap.sh
     label_nodes.sh
     apply_all.sh
     teardown.sh
@@ -179,6 +190,8 @@ Logical Layers:
     conftest/
   config/
     cluster-config.yaml
+    kind-cluster.yaml
+    k3d-cluster.yaml
     ingress-values.yaml
   manifests/
     (Generated or static compiled configs)
@@ -201,7 +214,7 @@ Logical Layers:
 | staging (future) | Pre‑prod validation | Real K8s | dev after drift-free |
 | prod (future) | Mission operation | Multi-region | staging after SLO stable |
 
-Local uses ephemeral storage (hostPath or local-path provisioner). Staging/prod will migrate to network-attached or SSD-backed PV classes.
+Local clusters rely on the Rancher `local-path` CSI provisioner (works for both kind and k3d). Staging/prod will migrate to network-attached or SSD-backed PV classes.
 
 ---
 
@@ -211,6 +224,8 @@ Nodes:
 1. Linux x86_64 (control-plane + data services affinity).
 2. macOS ARM #1 (GPU candidate, label: `arch=arm64, accelerator=gpu, role=ml`).
 3. macOS ARM #2 (general ARM workloads, label: `arch=arm64, role=general`).
+
+Local simulation uses kind (`config/kind-cluster.yaml` + `scripts/kind_bootstrap.sh`) to spin up a 3-node cluster (1 control-plane, 2 workers) with equivalent scheduling labels applied via `scripts/label_nodes.sh`.
 
 Node Labeling Script: `scripts/label_nodes.sh`
 
@@ -315,16 +330,23 @@ Suggested Transition:
 
 ## 11. Secrets & Configuration Management
 
-| Method | Use Case | Notes |
-|--------|----------|-------|
-| K8s Secrets (opaque) | Local bootstrap | Base64 encoded; not secure at rest |
-| SOPS + Git | Versioned but encrypted config (future) | Age or GPG keys |
-| External Secrets (future) | Cloud secret managers | Offloads rotation |
-| Static configMaps | Non-sensitive configs | Mount as read-only |
+**SOPS (default)**
+- `.sops.yaml` defines Age-backed creation rules for `secrets/`, `k8s/**/secrets/`, Terraform `*.tfvars`, and the walkthrough assets under `examples/sops/`.
+- Generate your own Age key with `age-keygen -o ~/.config/sops/age/keys.txt` (or reuse an existing team key) and add the public recipient to `.sops.yaml`.
+- `examples/sops/demo.agekey` is a demo-only private key; use it to explore the flow, then replace with your personal key before committing real secrets.
+- Walkthrough manifests live at `examples/sops/demo-secret.plain.yaml` (source) and `examples/sops/demo-secret.enc.yaml` (encrypted). Keep plaintext helpers as `*.plain.yaml` and commit only the encrypted variants.
+- Encrypt new files in place: `cp path/to/secret.yaml path/to/secret.enc.yaml && sops --encrypt --in-place path/to/secret.enc.yaml`.
+- Decrypt with an explicit key file: `SOPS_AGE_KEY_FILE=examples/sops/demo.agekey sops --decrypt examples/sops/demo-secret.enc.yaml`.
 
-Secret Rotation Script: `scripts/rotate_secrets.sh`
+**Kubernetes Secrets (bootstrap)**
+- Plain K8s secrets remain available for quick local smoke tests, but they are base64 only—prefer migrating them into SOPS-managed overlays.
 
-Never commit raw credentials; provide `*.example` templates for required secrets.
+**External Secrets (roadmap)**
+- Longer term we will integrate with cloud secret managers via External Secrets Operator once cloud landing zones are ready.
+
+**Helpers**
+- `scripts/rotate_secrets.sh` will re-encrypt all tracked files when recipients change.
+- `secrets/` remains gitignored; never commit production credentials, only encrypted artefacts or `.example` templates.
 
 ---
 
@@ -348,21 +370,26 @@ TLS (Optional for Local):
 
 | Data Type | Storage Class | Retention |
 |-----------|---------------|-----------|
-| ClickHouse primary | fast-local (hostPath / local-path) | 90d raw, TTLs |
-| PostgreSQL metadata | standard-local | Indefinite (backups) |
-| MinIO artifacts | standard-local | Configurable lifecycle |
-| Kafka logs | standard-local | 7d retention (topic-level) |
+| ClickHouse primary | fast-local (`rancher.io/local-path`, WaitForFirstConsumer) | 90d raw, TTLs |
+| PostgreSQL metadata | standard-local (`rancher.io/local-path`) | Indefinite (backups) |
+| MinIO artifacts | standard-local (`rancher.io/local-path`) | Configurable lifecycle |
+| Kafka logs | standard-local (`rancher.io/local-path`) | 7d retention (topic-level) |
 | Redis | memory + ephemeral | No persistence required early |
-| Backups | MinIO bucket `backups/` | Policy managed by lifecycle |
+| Backups | backup-storage (`rancher.io/local-path`, Retain) | MinIO lifecycle rules |
 
 Data tier classification:
 - Tier 0: Critical (Postgres schema & MinIO artifacts, ClickHouse metadata)
 - Tier 1: Recomputable (Cache, Kafka streams)
 - Tier 2: Synthetic (Derived views, projections)
 
+Storage verification (local):
+- `make verify` confirms `standard-local`, `fast-local`, and `backup-storage` are backed by the `rancher.io/local-path` provisioner on both kind and k3d clusters.
+
 ---
 
 ## 14. Backup & Restore Strategy
+
+For the step-by-step operational checklist, see `docs/backup-restore-runbook.md`.
 
 | Component | Backup Method | Frequency | Tooling |
 |-----------|---------------|----------|---------|
@@ -382,6 +409,10 @@ Retention Policy:
 - Keep last 7 daily
 - Keep 4 weekly
 - Keep 3 monthly (configurable in backup CronJob env)
+
+Implementation Notes:
+- CronJobs (`clickhouse-backup`, `postgres-backup`) stream artifacts to MinIO prefixes `backups/<component>/<tier>/`.
+- `minio-backup-maintenance` ensures the `backups` bucket exists, versioning is enabled, and lifecycle rules enforce the tiered retention windows.
 
 ---
 
@@ -486,19 +517,23 @@ Annotations:
 Make Targets (suggested):
 | Target | Action |
 |--------|--------|
-| make kind-up | Bootstrap kind multi-node cluster |
-| make kind-down | Destroy cluster |
+| make k3d-up | Bootstrap k3d multi-node cluster (default) |
+| make k3d-down | Destroy k3d cluster |
+| make kind-up | Bootstrap kind multi-node cluster (alternative) |
+| make kind-down | Destroy kind cluster |
 | make k8s-apply-base | Apply base infra (namespaces, policies) |
 | make k8s-apply-platform | Deploy data + platform components |
-| make verify | Run cluster health verification script |
+| make verify | Run cluster health + storage verification script |
+| make validate | Render Kustomize overlays, run kubeconform & Conftest, Terraform fmt/validate |
 | make backup-run | Trigger ad-hoc backup jobs |
 | make drift-check | Validate terraform + k8s drift |
 | make clean | Remove temp artifacts |
 
 Scripts:
-- `kind_bootstrap.sh`: Creates cluster w/ worker node labels.
+- `kind_bootstrap.sh`: Creates kind cluster w/ worker node labels.
+- `k3d_bootstrap.sh`: Alternative k3d cluster bootstrap (mirrors layout).
 - `apply_all.sh`: Ordered apply (base → data → platform).
-- `verify.sh`: Checks critical endpoints/liveness.
+- `verify.sh`: Validates storage classes and checks critical endpoints/liveness.
 - `backup_clickhouse.sh`: Manual snapshot invoker.
 
 ---
@@ -506,7 +541,7 @@ Scripts:
 ## 20. CI/CD Pipeline (Infra Changes)
 
 Pipeline Stages:
-1. Lint & Format (Terraform fmt/validate, Kustomize validate)
+1. Lint & Format (Terraform fmt/validate, Kustomize render, kubeconform schema checks)
 2. Security Scan (tfsec, kube-score)
 3. Policy Check (Conftest OPA)
 4. Terraform Plan (for applicable stacks)
@@ -577,7 +612,7 @@ Resource Classes:
 | Capability | Local Strategy | Cloud Evolution |
 |------------|----------------|-----------------|
 | Cluster | kind/k3d | Managed K8s (EKS/GKE) |
-| Storage | hostPath/local-path | EBS / PD / CSI |
+| Storage | Rancher local-path CSI | EBS / PD / CSI |
 | Secrets | Manual / K8s | AWS/GCP Secret Manager + ExternalSecrets |
 | Ingress | NGINX | Cloud LB + Ingress Controller |
 | Observability | Self-hosted | Managed (CloudWatch / GCP Ops + Tempo/Loki) |
@@ -610,6 +645,8 @@ Commit Message Examples:
 ---
 
 ## 26. Troubleshooting Matrix
+
+For the full incident triage playbook, see `docs/troubleshooting-runbook.md`.
 
 | Issue | Symptom | Diagnostics | Resolution |
 |-------|---------|-------------|-----------|

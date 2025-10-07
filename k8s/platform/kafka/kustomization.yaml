@@ -5,6 +5,7 @@ namespace: data-plane
 
 resources:
   - kafka.yaml
+  - jmx-exporter-config.yaml
 
 labels:
   - pairs:

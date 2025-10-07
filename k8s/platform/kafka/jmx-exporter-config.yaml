@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-jmx-exporter-config
+  namespace: data-plane
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: "254carbon"
+data:
+  config.yaml: |
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      - pattern: kafka.server<type=(.+), name=(.+)PerSec\w*><>Count
+        name: kafka_server_$1_$2_total
+        type: COUNTER
+      - pattern: kafka.server<type=(.+), name=(.+)><>OneMinuteRate
+        name: kafka_server_$1_$2_rate
+        type: GAUGE
+      - pattern: kafka.network<type=(.+), name=(.+)><>OneMinuteRate
+        name: kafka_network_$1_$2_rate
+        type: GAUGE
+      - pattern: kafka.controller<type=(.+), name=(.+)><>Value
+        name: kafka_controller_$1_$2
+        type: GAUGE

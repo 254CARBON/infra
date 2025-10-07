@@ -1,0 +1,36 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: local-254carbon
+networking:
+  disableDefaultCNI: false
+  kubeProxyMode: iptables
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.28.9
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+      - containerPort: 3000
+        hostPort: 3000
+        protocol: TCP
+      - containerPort: 8080
+        hostPort: 8080
+        protocol: TCP
+      - containerPort: 5000
+        hostPort: 5000
+        protocol: TCP
+      - containerPort: 9000
+        hostPort: 9000
+        protocol: TCP
+  - role: worker
+    image: kindest/node:v1.28.9
+  - role: worker
+    image: kindest/node:v1.28.9
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+      endpoint = ["http://localhost:5000"]

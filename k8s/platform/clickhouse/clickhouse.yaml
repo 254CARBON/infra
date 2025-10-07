@@ -1,4 +1,25 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-config
+  namespace: data-plane
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/part-of: "254carbon"
+data:
+  prometheus.xml: |
+    <clickhouse>
+      <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+        <status_info>true</status_info>
+      </prometheus>
+    </clickhouse>
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: clickhouse-credentials
@@ -49,6 +70,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 101
         fsGroup: 101
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 80
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 60
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: clickhouse
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: clickhouse
         image: clickhouse/clickhouse-server:latest
@@ -58,6 +104,8 @@ spec:
           containerPort: 8123
         - name: native
           containerPort: 9000
+        - name: metrics
+          containerPort: 9363
         env:
         - name: CLICKHOUSE_DB
           value: "default"
@@ -71,29 +119,46 @@ spec:
         volumeMounts:
         - name: clickhouse-storage
           mountPath: /var/lib/clickhouse
+        - name: clickhouse-config
+          mountPath: /etc/clickhouse-server/config.d/prometheus.xml
+          subPath: prometheus.xml
+          readOnly: true
         resources:
           requests:
-            cpu: 1
-            memory: 2Gi
+            cpu: 1500m
+            memory: 3Gi
           limits:
-            cpu: 2
-            memory: 4Gi
+            cpu: 3
+            memory: 6Gi
+        startupProbe:
+          httpGet:
+            path: /ping
+            port: 8123
+          failureThreshold: 15
+          periodSeconds: 10
         livenessProbe:
           httpGet:
             path: /ping
             port: 8123
-          initialDelaySeconds: 30
+          initialDelaySeconds: 45
           periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /ping
             port: 8123
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
       volumes:
       - name: clickhouse-storage
         persistentVolumeClaim:
           claimName: clickhouse-storage
+      - name: clickhouse-config
+        configMap:
+          name: clickhouse-config
 ---
 apiVersion: v1
 kind: Service
@@ -113,4 +178,7 @@ spec:
   - name: native
     port: 9000
     targetPort: 9000
+  - name: metrics
+    port: 9363
+    targetPort: 9363
   type: ClusterIP

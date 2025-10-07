@@ -5,6 +5,7 @@ namespace: storage
 
 resources:
   - minio.yaml
+  - minio-ingress.yaml
 
 labels:
   - pairs:

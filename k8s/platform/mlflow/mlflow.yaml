@@ -21,6 +21,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 20
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: mlflow
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: mlflow
         image: python:3.9-slim
@@ -53,23 +78,33 @@ spec:
           mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri $MLFLOW_BACKEND_STORE_URI --default-artifact-root $MLFLOW_DEFAULT_ARTIFACT_ROOT
         resources:
           requests:
-            cpu: 250m
-            memory: 256Mi
-          limits:
-            cpu: 500m
+            cpu: 400m
             memory: 512Mi
+          limits:
+            cpu: 800m
+            memory: 1Gi
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          failureThreshold: 24
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /health
             port: 5000
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 40
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /health
             port: 5000
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service

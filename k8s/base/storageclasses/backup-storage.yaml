@@ -5,9 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: backup-storage
     app.kubernetes.io/part-of: "254carbon"
-provisioner: k3d.io/hostpath
+provisioner: rancher.io/local-path
 reclaimPolicy: Retain
-volumeBindingMode: Immediate
+volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
-parameters:
-  path: "/var/lib/rancher/k3s/storage/backups"

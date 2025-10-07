@@ -33,6 +33,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 472
         fsGroup: 472
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 40
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 20
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: grafana
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: grafana
         image: grafana/grafana:latest
@@ -46,25 +71,57 @@ spec:
             secretKeyRef:
               name: grafana-credentials
               key: admin-password
+        - name: GF_METRICS_ENABLED
+          value: "true"
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 200m
+            memory: 256Mi
           limits:
-            cpu: 500m
+            cpu: 600m
             memory: 512Mi
+        volumeMounts:
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+          readOnly: true
+        - name: grafana-dashboard-providers
+          mountPath: /etc/grafana/provisioning/dashboards
+          readOnly: true
+        - name: grafana-dashboards
+          mountPath: /var/lib/grafana/dashboards/254carbon
+          readOnly: true
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          failureThreshold: 18
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /api/health
             port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /api/health
             port: 3000
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboard-providers
+        configMap:
+          name: grafana-dashboard-providers
+      - name: grafana-dashboards
+        configMap:
+          name: grafana-dashboards
 ---
 apiVersion: v1
 kind: Service

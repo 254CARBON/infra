@@ -6,6 +6,10 @@ namespace: observability
 resources:
   - prometheus.yaml
   - grafana.yaml
+  - grafana-ingress.yaml
+  - grafana-provisioning.yaml
+  - grafana-dashboards.yaml
+  - servicemonitors.yaml
 
 labels:
   - pairs:

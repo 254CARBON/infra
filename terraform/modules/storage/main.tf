@@ -21,14 +21,10 @@ resource "kubernetes_storage_class" "fast_local" {
     }
   }
 
-  storage_provisioner    = "k3d.io/hostpath"
+  storage_provisioner    = "rancher.io/local-path"
   reclaim_policy         = "Delete"
-  volume_binding_mode    = "Immediate"
+  volume_binding_mode    = "WaitForFirstConsumer"
   allow_volume_expansion = true
-
-  parameters = {
-    "path" = "/var/lib/rancher/k3s/storage"
-  }
 }
 
 # Standard local storage class (for general use)
@@ -41,14 +37,10 @@ resource "kubernetes_storage_class" "standard_local" {
     }
   }
 
-  storage_provisioner    = "k3d.io/hostpath"
+  storage_provisioner    = "rancher.io/local-path"
   reclaim_policy         = "Delete"
-  volume_binding_mode    = "Immediate"
+  volume_binding_mode    = "WaitForFirstConsumer"
   allow_volume_expansion = true
-
-  parameters = {
-    "path" = "/var/lib/rancher/k3s/storage"
-  }
 }
 
 # Backup storage class (for MinIO)
@@ -61,12 +53,8 @@ resource "kubernetes_storage_class" "backup_storage" {
     }
   }
 
-  storage_provisioner    = "k3d.io/hostpath"
+  storage_provisioner    = "rancher.io/local-path"
   reclaim_policy         = "Retain"
-  volume_binding_mode    = "Immediate"
+  volume_binding_mode    = "WaitForFirstConsumer"
   allow_volume_expansion = true
-
-  parameters = {
-    "path" = "/var/lib/rancher/k3s/storage/backups"
-  }
 }

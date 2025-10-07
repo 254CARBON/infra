@@ -1,74 +1,82 @@
 package kubernetes.admission
 
 # Deny pods with excessive privileges
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    input.spec.containers[_].securityContext.privileged == true
+    some container in input.spec.containers
+    container.securityContext.privileged == true
     msg := "Privileged pods are not allowed"
 }
 
 # Deny pods with hostPID
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
     input.spec.hostPID == true
     msg := "hostPID is not allowed"
 }
 
 # Deny pods with hostIPC
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
     input.spec.hostIPC == true
     msg := "hostIPC is not allowed"
 }
 
 # Deny pods with hostNetwork
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
     input.spec.hostNetwork == true
     msg := "hostNetwork is not allowed"
 }
 
 # Deny containers with ALL capabilities
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    input.spec.containers[_].securityContext.capabilities.add[_] == "ALL"
+    some container in input.spec.containers
+    some capability in container.securityContext.capabilities.add
+    capability == "ALL"
     msg := "ALL capabilities are not allowed"
 }
 
 # Deny containers with dangerous capabilities
 dangerous_caps := {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "SYS_RAWIO"}
 
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    cap := input.spec.containers[_].securityContext.capabilities.add[_]
-    dangerous_caps[cap]
-    msg := sprintf("Dangerous capability %s is not allowed", [cap])
+    some container in input.spec.containers
+    some capability in container.securityContext.capabilities.add
+    dangerous_caps[capability]
+    msg := sprintf("Dangerous capability %s is not allowed", [capability])
 }
 
 # Deny containers running as root
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    input.spec.containers[_].securityContext.runAsUser == 0
+    some container in input.spec.containers
+    container.securityContext.runAsUser == 0
     msg := "Containers must not run as root (runAsUser: 0)"
 }
 
 # Deny containers without security context
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    not input.spec.containers[_].securityContext
+    some container in input.spec.containers
+    not container.securityContext
     msg := "All containers must have securityContext defined"
 }
 
 # Deny containers without resource limits
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    not input.spec.containers[_].resources.limits
+    some container in input.spec.containers
+    not container.resources.limits
     msg := "All containers must have resource limits defined"
 }
 
 # Deny containers without resource requests
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
-    not input.spec.containers[_].resources.requests
+    some container in input.spec.containers
+    not container.resources.requests
     msg := "All containers must have resource requests defined"
 }

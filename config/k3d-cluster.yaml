@@ -26,9 +26,6 @@ options:
       - arg: "--disable=servicelb"
         nodeFilters:
           - server:*
-      - arg: "--disable=local-storage"
-        nodeFilters:
-          - server:*
   kubeconfig:
     updateDefaultKubeconfig: true
     switchCurrentContext: true

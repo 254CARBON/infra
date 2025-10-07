@@ -49,6 +49,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 80
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 60
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: kafka
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: kafka
         image: confluentinc/cp-kafka:latest
@@ -56,6 +81,8 @@ spec:
         ports:
         - name: kafka
           containerPort: 9092
+        - name: jmx
+          containerPort: 9999
         env:
         - name: KAFKA_BROKER_ID
           value: "1"
@@ -71,20 +98,92 @@ spec:
           value: "1"
         - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
           value: "1"
+        - name: KAFKA_JMX_PORT
+          value: "9999"
+        - name: KAFKA_JMX_HOSTNAME
+          value: "0.0.0.0"
+        - name: JMX_PORT
+          value: "9999"
         volumeMounts:
         - name: kafka-storage
           mountPath: /var/lib/kafka/data
         resources:
           requests:
-            cpu: 1
-            memory: 1Gi
+            cpu: 1200m
+            memory: 2Gi
           limits:
             cpu: 2
-            memory: 2Gi
+            memory: 4Gi
+        startupProbe:
+          tcpSocket:
+            port: 9092
+          failureThreshold: 30
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      - name: kafka-jmx-exporter
+        image: ghcr.io/bitnami/jmx-exporter:0.18.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --config.file=/etc/jmx-exporter/config.yaml
+        - --web.listen-address=:9404
+        ports:
+        - name: metrics
+          containerPort: 9404
+        volumeMounts:
+        - name: kafka-jmx-exporter-config
+          mountPath: /etc/jmx-exporter
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+        readinessProbe:
+          httpGet:
+            path: /
+            port: metrics
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: metrics
+          initialDelaySeconds: 40
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 5
       volumes:
       - name: kafka-storage
         persistentVolumeClaim:
           claimName: kafka-storage
+      - name: kafka-jmx-exporter-config
+        configMap:
+          name: kafka-jmx-exporter-config
 ---
 apiVersion: v1
 kind: Service
@@ -101,4 +200,7 @@ spec:
   - name: kafka
     port: 9092
     targetPort: 9092
+  - name: metrics
+    port: 9404
+    targetPort: 9404
   type: ClusterIP

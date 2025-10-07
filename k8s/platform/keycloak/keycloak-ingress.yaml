@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: platform-core
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: "254carbon"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: keycloak.local.254carbon
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: keycloak
+            port:
+              name: http

@@ -1,0 +1,47 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ingress-nginx
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: "254carbon"
+    tier: platform
+    domain: networking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/component: controller
+  namespaceSelector:
+    matchNames:
+      - ingress-nginx
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ingress-nginx
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: "254carbon"
+    tier: platform
+    domain: networking
+spec:
+  groups:
+    - name: ingress-nginx
+      rules:
+        - alert: NginxIngressDown
+          expr: up{service=\"ingress-nginx-controller\"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Nginx Ingress Controller is down"
+            description: "Ingress controller metrics endpoint is not reporting for more than 1 minute."

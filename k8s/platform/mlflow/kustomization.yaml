@@ -5,6 +5,7 @@ namespace: ml
 
 resources:
   - mlflow.yaml
+  - mlflow-ingress.yaml
 
 labels:
   - pairs:

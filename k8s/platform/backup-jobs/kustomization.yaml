@@ -4,8 +4,10 @@ kind: Kustomization
 namespace: backup
 
 resources:
+  - secrets.yaml
   - clickhouse-backup.yaml
   - postgres-backup.yaml
+  - minio-lifecycle.yaml
 
 labels:
   - pairs:

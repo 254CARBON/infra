@@ -33,6 +33,31 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 60
+            preference:
+              matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - core
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 40
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: keycloak
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: keycloak
         image: quay.io/keycloak/keycloak:latest
@@ -59,28 +84,40 @@ spec:
             secretKeyRef:
               name: postgres-credentials
               key: password
+        - name: KC_METRICS_ENABLED
+          value: "true"
         args:
         - start
         - --optimized
         resources:
           requests:
-            cpu: 500m
-            memory: 512Mi
-          limits:
-            cpu: 1
+            cpu: 750m
             memory: 1Gi
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          failureThreshold: 36
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /health/live
             port: 8080
-          initialDelaySeconds: 60
-          periodSeconds: 30
+          initialDelaySeconds: 90
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 6
         readinessProbe:
           httpGet:
             path: /health/ready
             port: 8080
-          initialDelaySeconds: 30
+          initialDelaySeconds: 45
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service

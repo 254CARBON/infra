@@ -1,7 +1,7 @@
 package kubernetes.admission
 
 # Deny hostPath volumes
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
     volume := input.spec.volumes[_]
     volume.hostPath
@@ -9,7 +9,7 @@ deny[msg] {
 }
 
 # Deny hostPath volumes in StatefulSets
-deny[msg] {
+deny contains msg if {
     input.kind == "StatefulSet"
     volume := input.spec.template.spec.volumes[_]
     volume.hostPath
@@ -17,7 +17,7 @@ deny[msg] {
 }
 
 # Deny hostPath volumes in Deployments
-deny[msg] {
+deny contains msg if {
     input.kind == "Deployment"
     volume := input.spec.template.spec.volumes[_]
     volume.hostPath
@@ -25,7 +25,7 @@ deny[msg] {
 }
 
 # Deny hostPath volumes in DaemonSets
-deny[msg] {
+deny contains msg if {
     input.kind == "DaemonSet"
     volume := input.spec.template.spec.volumes[_]
     volume.hostPath
@@ -33,7 +33,7 @@ deny[msg] {
 }
 
 # Deny hostPath volumes in Jobs
-deny[msg] {
+deny contains msg if {
     input.kind == "Job"
     volume := input.spec.template.spec.volumes[_]
     volume.hostPath
@@ -41,7 +41,7 @@ deny[msg] {
 }
 
 # Deny hostPath volumes in CronJobs
-deny[msg] {
+deny contains msg if {
     input.kind == "CronJob"
     volume := input.spec.jobTemplate.spec.template.spec.volumes[_]
     volume.hostPath
@@ -51,11 +51,13 @@ deny[msg] {
 # Allow specific hostPath volumes for system components (with exceptions)
 allowed_hostpaths := {
     "/var/lib/rancher/k3s/storage",
+    "/var/local-path-provisioner",
+    "/opt/local-path-provisioner",
     "/var/log",
     "/tmp"
 }
 
-deny[msg] {
+deny contains msg if {
     input.kind == "Pod"
     volume := input.spec.volumes[_]
     volume.hostPath

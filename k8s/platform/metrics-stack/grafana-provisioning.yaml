@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: "254carbon"
+    grafana_datasource: "true"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus.observability.svc.cluster.local:9090
+        access: proxy
+        isDefault: true
+        editable: false
+        uid: prometheus
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-providers
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: "254carbon"
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 254carbon
+        orgId: 1
+        folder: 254Carbon
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/254carbon
