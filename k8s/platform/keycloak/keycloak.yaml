@@ -62,9 +62,19 @@ spec:
       - name: keycloak
         image: quay.io/keycloak/keycloak:latest
         imagePullPolicy: IfNotPresent
+        command: ["/bin/bash","-lc"]
+        args:
+        - |
+          set -euo pipefail
+          echo "[keycloak] Running one-time build"
+          /opt/keycloak/bin/kc.sh build
+          echo "[keycloak] Starting server"
+          exec /opt/keycloak/bin/kc.sh start --http-enabled=true --hostname=keycloak.platform-core.svc.cluster.local --hostname-strict=false
         ports:
         - name: http
           containerPort: 8080
+        - name: management
+          containerPort: 9000
         env:
         - name: KEYCLOAK_ADMIN
           value: "admin"
@@ -86,9 +96,12 @@ spec:
               key: password
         - name: KC_METRICS_ENABLED
           value: "true"
-        args:
-        - start
-        - --optimized
+        - name: KC_HTTP_ENABLED
+          value: "true"
+        - name: KC_HOSTNAME
+          value: "keycloak.platform-core.svc.cluster.local"
+        - name: KC_HEALTH_ENABLED
+          value: "true"
         resources:
           requests:
             cpu: 750m
@@ -99,13 +112,13 @@ spec:
         startupProbe:
           httpGet:
             path: /health/live
-            port: 8080
+            port: 9000
           failureThreshold: 36
           periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /health/live
-            port: 8080
+            port: 9000
           initialDelaySeconds: 90
           periodSeconds: 20
           timeoutSeconds: 5
@@ -113,7 +126,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /health/ready
-            port: 8080
+            port: 9000
           initialDelaySeconds: 45
           periodSeconds: 10
           timeoutSeconds: 5

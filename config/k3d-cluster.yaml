@@ -6,14 +6,26 @@ servers: 1
 agents: 2
 kubeAPI:
   host: 0.0.0.0
-  hostPort: 6443
+  hostPort: "6443"
 ports:
-  - port: 80:80@loadbalancer
-  - port: 443:443@loadbalancer
-  - port: 3000:3000@loadbalancer  # Grafana
-  - port: 8080:8080@loadbalancer  # Keycloak
-  - port: 5000:5000@loadbalancer  # MLflow
-  - port: 9000:9000@loadbalancer  # MinIO
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+  - port: 443:443
+    nodeFilters:
+      - loadbalancer
+  - port: 3000:3000  # Grafana
+    nodeFilters:
+      - loadbalancer
+  - port: 8080:8080  # Keycloak
+    nodeFilters:
+      - loadbalancer
+  - port: 5000:5000  # MLflow
+    nodeFilters:
+      - loadbalancer
+  - port: 9000:9000  # MinIO
+    nodeFilters:
+      - loadbalancer
 options:
   k3d:
     wait: true
@@ -29,25 +41,14 @@ options:
   kubeconfig:
     updateDefaultKubeconfig: true
     switchCurrentContext: true
-registries:
-  create:
-    name: k3d-254carbon-registry
-    host: 0.0.0.0
-    hostPort: "5000"
-  use:
-    - k3d-254carbon-registry:5000
-    - registry.k8s.io
-    - docker.io
-    - quay.io
-    - ghcr.io
 volumes:
-  - volume: /var/lib/rancher/k3s/storage@server:0
+  - volume: k3d-storage-server:/var/lib/rancher/k3s/storage
     nodeFilters:
       - server:0
-  - volume: /var/lib/rancher/k3s/storage@agent:0
+  - volume: k3d-storage-agent-0:/var/lib/rancher/k3s/storage
     nodeFilters:
       - agent:0
-  - volume: /var/lib/rancher/k3s/storage@agent:1
+  - volume: k3d-storage-agent-1:/var/lib/rancher/k3s/storage
     nodeFilters:
       - agent:1
 env:

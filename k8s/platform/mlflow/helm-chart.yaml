@@ -1,0 +1,804 @@
+---
+# Source: mlflow/templates/run/networkpolicy.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: mlflow-run
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: run
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: mlflow
+      app.kubernetes.io/name: mlflow
+      app.kubernetes.io/part-of: mlflow
+      app.kubernetes.io/component: run
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+---
+# Source: mlflow/templates/tracking/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlflow-tracking
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: tracking
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: mlflow
+      app.kubernetes.io/name: mlflow
+      app.kubernetes.io/part-of: mlflow
+      app.kubernetes.io/component: tracking
+---
+# Source: mlflow/templates/run/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlflow-run
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: run
+automountServiceAccountToken: false
+---
+# Source: mlflow/templates/tracking/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlflow-tracking
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: tracking
+automountServiceAccountToken: false
+---
+# Source: mlflow/templates/tracking/auth-secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlflow-tracking
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: tracking
+data:
+  # We need to add the username as it is required by the ServiceMonitor object
+  admin-user: "dXNlcg=="
+  admin-password: "N05pTnk2WW1qZFlv"
+  flask-server-secret-key: "c0p2azk1Q3E0TQ=="
+---
+# Source: mlflow/templates/tracking/configmap-overrides.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlflow-tracking-auth-overrides
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+data:
+  # Use render-template to substitute with environment variables
+  basic_auth_overrides.ini: |
+    database_uri = {{ MLFLOW_DATABASE_AUTH_URI }}
+    admin_username = {{ MLFLOW_TRACKING_USERNAME }}
+    admin_password = {{ MLFLOW_TRACKING_PASSWORD }}
+---
+# Source: mlflow/templates/tracking/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-tracking
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: tracking
+spec:
+  type: LoadBalancer
+  sessionAffinity: None
+  externalTrafficPolicy: "Cluster"
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http
+  selector:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: tracking
+---
+# Source: mlflow/templates/run/dep-job.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-run
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: run
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: mlflow
+      app.kubernetes.io/name: mlflow
+      app.kubernetes.io/part-of: mlflow
+      app.kubernetes.io/component: run
+  strategy:
+    rollingUpdate: {}
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/source: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+      labels:
+        app.kubernetes.io/instance: mlflow
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: mlflow
+        app.kubernetes.io/version: 3.3.2
+        helm.sh/chart: mlflow-5.1.17
+        app.kubernetes.io/part-of: mlflow
+        app.kubernetes.io/component: run
+    spec:
+      
+      serviceAccountName: mlflow-run
+      automountServiceAccountToken: false
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: mlflow
+                    app.kubernetes.io/name: mlflow
+                    app.kubernetes.io/component: run
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: Always
+        supplementalGroups: []
+        sysctls: []
+      initContainers:
+        # Wait for tracking service
+        - name: wait-for-tracking
+          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+            - -ec
+            - |
+              #!/bin/bash
+              retry_while() {
+                local -r cmd="${1:?cmd is missing}"
+                local -r retries="${2:-12}"
+                local -r sleep_time="${3:-5}"
+                local return_value=1
+        
+                read -r -a command <<< "$cmd"
+                for ((i = 1 ; i <= retries ; i+=1 )); do
+                    "${command[@]}" && return_value=0 && break
+                    sleep "$sleep_time"
+                done
+                return $return_value
+              }
+        
+              check_host() {
+                  local -r host="${1:-?missing host}"
+                  local -r port="${2:-?missing port}"
+                  if wait-for-port --timeout=5 --host=${host} --state=inuse $port ; then
+                     return 0
+                  else
+                     return 1
+                  fi
+              }
+        
+              echo "Checking connection to mlflow-tracking:80"
+              if ! retry_while "check_host mlflow-tracking 80"; then
+                  echo "Connection error"
+                  exit 1
+              fi
+        
+              echo "Connection success"
+              exit 0
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              cpu: 750m
+              ephemeral-storage: 2Gi
+              memory: 768Mi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 50Mi
+              memory: 512Mi
+      containers:
+        - name: mlflow
+          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+          args:
+            - -ec
+            - |
+              #!/bin/bash
+              sleep infinity
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow-tracking:80"
+            - name: MLFLOW_TRACKING_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-tracking
+                  key: "admin-user"
+            - name: MLFLOW_TRACKING_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-tracking
+                  key: "admin-password"
+          envFrom:
+          resources:
+            limits:
+              cpu: 750m
+              ephemeral-storage: 2Gi
+              memory: 768Mi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 50Mi
+              memory: 512Mi
+          volumeMounts:
+            - name: source
+              mountPath: /app
+            - name: tmp
+              mountPath: /tmp
+            - name: mlruns
+              mountPath: /app/mlruns
+            - name: mlartifacts
+              mountPath: /app/mlartifacts
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: mlruns
+          emptyDir: {}
+        - name: mlartifacts
+          emptyDir: {}
+        - name: source
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+---
+# Source: mlflow/templates/tracking/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-tracking
+  namespace: "ml"
+  labels:
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/version: 3.3.2
+    helm.sh/chart: mlflow-5.1.17
+    app.kubernetes.io/part-of: mlflow
+    app.kubernetes.io/component: tracking
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: mlflow
+      app.kubernetes.io/name: mlflow
+      app.kubernetes.io/part-of: mlflow
+      app.kubernetes.io/component: tracking
+  template:
+    metadata:
+      annotations:
+        checksum/auth: 562335b644c8f7af9a4a7273d1b3b4c189b381433f7553d9f579312298b5778b
+      labels:
+        app.kubernetes.io/instance: mlflow
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: mlflow
+        app.kubernetes.io/version: 3.3.2
+        helm.sh/chart: mlflow-5.1.17
+        app.kubernetes.io/part-of: mlflow
+        app.kubernetes.io/component: tracking
+    spec:
+      serviceAccountName: mlflow-tracking
+      
+      automountServiceAccountToken: false
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: mlflow
+                    app.kubernetes.io/name: mlflow
+                    app.kubernetes.io/component: mlflow
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: Always
+        supplementalGroups: []
+        sysctls: []
+      initContainers:
+        # Init container for PostgreSQL
+        - name: wait-for-database
+          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+            - -ec
+            - |
+              #!/bin/bash
+              retry_while() {
+                local -r cmd="${1:?cmd is missing}"
+                local -r retries="${2:-12}"
+                local -r sleep_time="${3:-5}"
+                local return_value=1
+        
+                read -r -a command <<< "$cmd"
+                for ((i = 1 ; i <= retries ; i+=1 )); do
+                    "${command[@]}" && return_value=0 && break
+                    sleep "$sleep_time"
+                done
+                return $return_value
+              }
+        
+              check_host() {
+                  local -r host="${1:-?missing host}"
+                  local -r port="${2:-?missing port}"
+                  if wait-for-port --timeout=5 --host=${host} --state=inuse $port ; then
+                     return 0
+                  else
+                     return 1
+                  fi
+              }
+        
+              echo "Checking connection to postgresql.data-plane.svc.cluster.local:5432"
+              if ! retry_while "check_host postgresql.data-plane.svc.cluster.local 5432"; then
+                  echo "Connection error"
+                  exit 1
+              fi
+        
+              echo "Connection success"
+              exit 0
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              cpu: 750m
+              ephemeral-storage: 2Gi
+              memory: 768Mi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 50Mi
+              memory: 512Mi
+        # Render basic auth configuration
+        - name: get-default-auth-conf
+          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+            - -ec
+            - |
+              #!/bin/bash
+              cp /bitnami/mlflow-basic-auth/basic_auth.ini /bitnami/rendered-basic-auth/basic_auth.ini
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rendered-basic-auth
+              mountPath: /bitnami/rendered-basic-auth
+          resources:
+            limits:
+              cpu: 800m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 512Mi
+        - name: render-auth-conf
+          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+            - -ec
+            - |
+              #!/bin/bash
+              # First render the overrides
+              render-template /bitnami/basic-auth-overrides/*.ini > /tmp/rendered-overrides.ini
+              # Loop through the ini overrides and apply it to the final basic_auth.ini
+              # read the file line by line
+              while IFS='=' read -r key value
+              do
+                # remove leading and trailing spaces from key and value
+                key="$(echo $key | tr -d " ")"
+                value="$(echo $value | tr -d " ")"
+        
+                ini-file set -s mlflow -k "$key" -v "$value" /bitnami/rendered-basic-auth/basic_auth.ini
+              done < "/tmp/rendered-overrides.ini"
+              # Remove temporary files
+              rm /tmp/rendered-overrides.ini
+          env:
+            - name: MLFLOW_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: "password"
+            - name: MLFLOW_DATABASE_AUTH_URI
+              value: "postgresql://postgres:$(MLFLOW_DATABASE_PASSWORD)@postgresql.data-plane.svc.cluster.local:5432/mlflow_auth"
+            - name: MLFLOW_TRACKING_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-tracking
+                  key: "admin-user"
+            - name: MLFLOW_TRACKING_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-tracking
+                  key: "admin-password"
+          envFrom:
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: basic-auth-overrides
+              mountPath: /bitnami/basic-auth-overrides
+            - name: rendered-basic-auth
+              mountPath: /bitnami/rendered-basic-auth
+          resources:
+            limits:
+              cpu: 800m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 512Mi
+        # Perform upgrade of the Auth Database
+        - name: upgrade-db-auth
+          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - python
+          args:
+            - -m
+            - mlflow.server.auth
+            - db
+            - upgrade
+            - --url
+            - postgresql://postgres:$(MLFLOW_DATABASE_PASSWORD)@postgresql.data-plane.svc.cluster.local:5432/mlflow_auth
+          env:
+            - name: MLFLOW_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: "password"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              cpu: 800m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 512Mi
+        # Wait for S3 backend to be ready
+        - name: wait-for-s3
+          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - bash
+            - -ec
+            - |
+              #!/bin/bash
+              retry_while() {
+                local -r cmd="${1:?cmd is missing}"
+                local -r retries="${2:-12}"
+                local -r sleep_time="${3:-5}"
+                local return_value=1
+        
+                read -r -a command <<< "$cmd"
+                for ((i = 1 ; i <= retries ; i+=1 )); do
+                    "${command[@]}" && return_value=0 && break
+                    sleep "$sleep_time"
+                done
+                return $return_value
+              }
+        
+              check_host() {
+                  local -r host="${1:-?missing host}"
+                  local -r port="${2:-?missing port}"
+                  if wait-for-port --timeout=5 --host=${host} --state=inuse $port ; then
+                     return 0
+                  else
+                     return 1
+                  fi
+              }
+        
+              echo "Checking connection to minio.storage.svc.cluster.local:9000"
+              if ! retry_while "check_host minio.storage.svc.cluster.local 9000"; then
+                  echo "Connection error"
+                  exit 1
+              fi
+        
+              echo "Connection success"
+              exit 0
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              cpu: 750m
+              ephemeral-storage: 2Gi
+              memory: 768Mi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 50Mi
+              memory: 512Mi
+      containers:
+        - name: mlflow
+          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - mlflow
+          args:
+            - server
+            - --gunicorn-opts='--timeout=120'
+            - --backend-store-uri=postgresql://postgres:$(MLFLOW_DATABASE_PASSWORD)@postgresql.data-plane.svc.cluster.local:5432/254carbon
+            - --artifacts-destination=s3://mlflow-artifacts
+            - --serve-artifacts
+            - --host=0.0.0.0
+            - --port=5000
+            - --app-name=basic-auth
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: MLFLOW_FLASK_SERVER_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-tracking
+                  key: "flask-server-secret-key"
+            - name: MLFLOW_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: "password"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: "access-key"
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: "secret-key"
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: "http://minio.storage.svc.cluster.local:9000"
+          envFrom:
+          resources:
+            limits:
+              cpu: 800m
+              memory: 1Gi
+            requests:
+              cpu: 400m
+              memory: 512Mi
+          ports:
+            - name: http
+              containerPort: 5000
+          livenessProbe:
+            failureThreshold: 5
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            successThreshold: 1
+            timeoutSeconds: 3
+            exec:
+              command:
+                - pgrep
+                - -f
+                - mlflow.server
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+            tcpSocket:
+              port: http
+          startupProbe:
+            failureThreshold: 24
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+            tcpSocket:
+              port: http
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: mlruns
+              mountPath: /app/mlruns
+            - name: mlartifacts
+              mountPath: /app/mlartifacts
+            - name: rendered-basic-auth
+              mountPath: /bitnami/mlflow-basic-auth/basic_auth.ini
+              subPath: basic_auth.ini
+            - name: data
+              mountPath: /bitnami/mlflow
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: mlruns
+          emptyDir: {}
+        - name: mlartifacts
+          emptyDir: {}
+        - name: basic-auth-overrides
+          configMap:
+            name: mlflow-tracking-auth-overrides
+        - name: rendered-basic-auth
+          emptyDir: {}
+        - name: data
+          emptyDir: {}

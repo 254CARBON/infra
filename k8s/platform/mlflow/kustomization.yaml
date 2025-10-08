@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: ml
 
 resources:
-  - mlflow.yaml
+  - helm-chart.yaml
   - mlflow-ingress.yaml
 
 labels:

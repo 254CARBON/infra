@@ -45,6 +45,44 @@ spec:
         app.kubernetes.io/name: kafka
         app.kubernetes.io/part-of: "254carbon"
     spec:
+      initContainers:
+      - name: init-format-kraft
+        image: confluentinc/cp-kafka:7.7.5
+        command: ["/bin/bash","-lc"]
+        args:
+        - |
+          set -euo pipefail
+          # always cleanup stray 'logs' subdir which breaks KRaft scanning
+          rm -rf /var/lib/kafka/data/logs || true
+          if [ -f /var/lib/kafka/data/meta.properties ]; then
+            echo '[kafka-init] meta.properties exists; skipping format.'
+            exit 0
+          fi
+          CFG=/tmp/kraft-format.properties
+          printf '%s\n' \
+            'process.roles=broker,controller' \
+            'node.id=1' \
+            'controller.quorum.voters=1@127.0.0.1:9093' \
+            'listeners=PLAINTEXT://:9092,CONTROLLER://:9093' \
+            'inter.broker.listener.name=PLAINTEXT' \
+            'log.dirs=/var/lib/kafka/data' \
+            > "$CFG"
+          echo "[kafka-init] Formatting storage with cluster id: ${CLUSTER_ID}"
+          kafka-storage format -t "$CLUSTER_ID" -c "$CFG"
+          # clean up any stale subdirs created by previous attempts
+          rm -rf /var/lib/kafka/data/logs || true
+          chown -R 1000:1000 /var/lib/kafka/data || true
+        env:
+        - name: CLUSTER_ID
+          value: "MkU3OEVBNTcwNTJENDM2Qk"
+        - name: KAFKA_CLUSTER_ID
+          value: "MkU3OEVBNTcwNTJENDM2Qk"
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        volumeMounts:
+        - name: kafka-storage
+          mountPath: /var/lib/kafka/data
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -76,37 +114,37 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: kafka
-        image: confluentinc/cp-kafka:latest
+        image: confluentinc/cp-kafka:7.7.5
         imagePullPolicy: IfNotPresent
+        command: ["/bin/bash","-lc"]
+        args:
+        - |
+          set -euo pipefail
+          exec kafka-server-start /etc/kafka/kraft/server.properties
         ports:
         - name: kafka
           containerPort: 9092
+        - name: controller
+          containerPort: 9093
         - name: jmx
           containerPort: 9999
         env:
-        - name: KAFKA_BROKER_ID
-          value: "1"
-        - name: KAFKA_ZOOKEEPER_CONNECT
-          value: "localhost:2181"
-        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
-          value: "PLAINTEXT:PLAINTEXT"
-        - name: KAFKA_ADVERTISED_LISTENERS
-          value: "PLAINTEXT://kafka:9092"
-        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
-          value: "1"
-        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-          value: "1"
-        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
-          value: "1"
-        - name: KAFKA_JMX_PORT
-          value: "9999"
-        - name: KAFKA_JMX_HOSTNAME
-          value: "0.0.0.0"
+        - name: CONFLUENT_SUPPORT_METRICS_ENABLE
+          value: "false"
         - name: JMX_PORT
           value: "9999"
+        - name: KAFKA_LOG4J_OPTS
+          value: "-Dlog4j.configuration=file:/etc/kafka/log4j-console.properties"
         volumeMounts:
         - name: kafka-storage
           mountPath: /var/lib/kafka/data
+        - name: kafka-kraft-config
+          mountPath: /etc/kafka/kraft/server.properties
+          subPath: server.properties
+          readOnly: true
+        - name: kafka-log4j-console
+          mountPath: /etc/kafka/log4j-console.properties
+          subPath: log4j-console.properties
         resources:
           requests:
             cpu: 1200m
@@ -118,31 +156,27 @@ spec:
           tcpSocket:
             port: 9092
           failureThreshold: 30
-          periodSeconds: 10
+          periodSeconds: 5
         livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - /usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 30
           periodSeconds: 20
           timeoutSeconds: 5
           failureThreshold: 6
         readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - /usr/bin/kafka-broker-api-versions --bootstrap-server localhost:9092
+          tcpSocket:
+            port: 9092
+          initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 5
+          timeoutSeconds: 3
           failureThreshold: 3
       - name: kafka-jmx-exporter
-        image: ghcr.io/bitnami/jmx-exporter:0.18.0
+        image: bitnami/jmx-exporter:latest
         imagePullPolicy: IfNotPresent
         args:
-        - --config.file=/etc/jmx-exporter/config.yaml
-        - --web.listen-address=:9404
+        - "9404"
+        - /etc/jmx-exporter/config.yaml
         ports:
         - name: metrics
           containerPort: 9404
@@ -181,6 +215,12 @@ spec:
       - name: kafka-storage
         persistentVolumeClaim:
           claimName: kafka-storage
+      - name: kafka-kraft-config
+        configMap:
+          name: kafka-kraft-server
+      - name: kafka-log4j-console
+        configMap:
+          name: kafka-log4j-console
       - name: kafka-jmx-exporter-config
         configMap:
           name: kafka-jmx-exporter-config

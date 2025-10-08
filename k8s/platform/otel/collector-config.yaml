@@ -22,8 +22,8 @@ data:
         send_batch_size: 512
         timeout: 5s
     exporters:
-      logging:
-        loglevel: warn
+      debug:
+        verbosity: normal
       prometheus:
         endpoint: 0.0.0.0:9464
         namespace: otelcol
@@ -31,15 +31,12 @@ data:
       health_check:
         endpoint: 0.0.0.0:13133
     service:
-      telemetry:
-        metrics:
-          address: 0.0.0.0:8888
       extensions: [health_check]
       pipelines:
         traces:
           receivers: [otlp]
           processors: [memory_limiter, batch]
-          exporters: [logging]
+          exporters: [debug]
         metrics:
           receivers: [otlp]
           processors: [memory_limiter, batch]
@@ -47,4 +44,4 @@ data:
         logs:
           receivers: [otlp]
           processors: [batch]
-          exporters: [logging]
+          exporters: [debug]
