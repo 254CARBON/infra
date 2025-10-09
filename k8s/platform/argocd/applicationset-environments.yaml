@@ -35,8 +35,6 @@ spec:
         repoURL: git://git-mirror.argocd.svc.cluster.local/infra.git
         targetRevision: '{{targetRevision}}'
         path: '{{overlayPath}}'
-        directory:
-          recurse: true
       destination:
         server: https://kubernetes.default.svc
       syncPolicy:

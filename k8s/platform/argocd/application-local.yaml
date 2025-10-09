@@ -16,8 +16,6 @@ spec:
     repoURL: git://git-mirror.argocd.svc.cluster.local/infra.git
     targetRevision: main
     path: k8s/overlays/local
-    directory:
-      recurse: true
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
