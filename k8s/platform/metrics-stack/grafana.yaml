@@ -96,6 +96,10 @@ spec:
         - name: grafana-dashboard-providers
           mountPath: /etc/grafana/provisioning/dashboards
           readOnly: true
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        - name: grafana-logs
+          mountPath: /var/log/grafana
         - name: grafana-dashboards
           mountPath: /var/lib/grafana/dashboards/254carbon
           readOnly: true
@@ -128,6 +132,10 @@ spec:
       - name: grafana-dashboard-providers
         configMap:
           name: grafana-dashboard-providers
+      - name: grafana-data
+        emptyDir: {}
+      - name: grafana-logs
+        emptyDir: {}
       - name: grafana-dashboards
         configMap:
           name: grafana-dashboards

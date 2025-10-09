@@ -9,7 +9,6 @@ resources:
   - ../../platform/kafka
   - ../../platform/minio
   - ../../platform/keycloak
-  - ../../platform/mlflow
   - ../../platform/metrics-stack
   - ../../platform/otel
   - ../../platform/ingress-nginx

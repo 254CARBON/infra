@@ -9,3 +9,12 @@ commonLabels:
 resources:
   - https://github.com/kyverno/kyverno/releases/download/v1.15.2/install.yaml
   - policies/require-signed-images.yaml
+
+patchesJson6902:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: kyverno-admission-controller
+      namespace: kyverno
+    path: kyverno-admission-controller-patch.yaml

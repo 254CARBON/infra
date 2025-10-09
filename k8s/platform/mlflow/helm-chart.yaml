@@ -474,41 +474,6 @@ spec:
               cpu: 500m
               ephemeral-storage: 50Mi
               memory: 512Mi
-        # Render basic auth configuration
-        - name: get-default-auth-conf
-          image: ghcr.io/254carbon/mirror/mlflow-bitnami@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-            runAsGroup: 1001
-            runAsNonRoot: true
-            runAsUser: 1001
-            seLinuxOptions: {}
-            seccompProfile:
-              type: RuntimeDefault
-          command:
-            - bash
-            - -ec
-            - |
-              #!/bin/bash
-              cp /bitnami/mlflow-basic-auth/basic_auth.ini /bitnami/rendered-basic-auth/basic_auth.ini
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-            - name: rendered-basic-auth
-              mountPath: /bitnami/rendered-basic-auth
-          resources:
-            limits:
-              cpu: 800m
-              memory: 1Gi
-            requests:
-              cpu: 400m
-              memory: 512Mi
         - name: render-auth-conf
           image: ghcr.io/254carbon/mirror/os-shell@sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857
           imagePullPolicy: IfNotPresent
@@ -530,6 +495,12 @@ spec:
             - -ec
             - |
               #!/bin/bash
+              cat <<'EOF' >/bitnami/rendered-basic-auth/basic_auth.ini
+              [mlflow]
+              database_uri =
+              admin_username =
+              admin_password =
+              EOF
               # First render the overrides
               render-template /bitnami/basic-auth-overrides/*.ini > /tmp/rendered-overrides.ini
               # Loop through the ini overrides and apply it to the final basic_auth.ini
@@ -562,7 +533,6 @@ spec:
                 secretKeyRef:
                   name: mlflow-tracking
                   key: "admin-password"
-          envFrom:
           volumeMounts:
             - name: tmp
               mountPath: /tmp

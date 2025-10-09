@@ -1,0 +1,11 @@
+- op: replace
+  path: /spec/template/spec/containers/0/args/19
+  value: --generateValidatingAdmissionPolicy=false
+- op: replace
+  path: /spec/template/spec/containers/0/readinessProbe
+  value:
+    tcpSocket:
+      port: https
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 6
