@@ -9,6 +9,7 @@ KIND_CLUSTER_NAME := $(CLUSTER_NAME)
 TERRAFORM_DIR := terraform/stacks/local
 CONTFEST_POLICY_DIR := policies/opa
 KUBECONFORM_FLAGS := -strict -ignore-missing-schemas -summary
+KUBECTL_APPLY := kubectl apply --server-side --field-manager=infra-make
 
 ifeq ($(CLUSTER_PROVIDER),kind)
 CLUSTER_UP_TARGET := kind-up
@@ -46,10 +47,10 @@ cluster-down: ## Destroy local cluster (CLUSTER_PROVIDER=kind|k3d)
 	$(MAKE) $(CLUSTER_DOWN_TARGET)
 
 k8s-apply-base: ## Apply base K8s manifests (namespaces, RBAC, policies)
-	kubectl apply -k k8s/base
+	$(KUBECTL_APPLY) -k k8s/base
 
 k8s-apply-platform: ## Deploy platform components via kustomize
-	kubectl apply -k $(KUSTOMIZE_DIR)
+	$(KUBECTL_APPLY) --force-conflicts -k $(KUSTOMIZE_DIR)
 
 verify: ## Run cluster health verification
 	bash scripts/verify.sh

@@ -1,14 +1,45 @@
 image:
-  registry: registry-1.docker.io
-  repository: bitnamicharts/mlflow
-  tag: ''
-  digest: sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+  registry: ghcr.io
+  repository: 254carbon/mirror/mlflow-bitnami
+  tag: "bitnami-5.1.17"
+  digest: "sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c"
   pullPolicy: IfNotPresent
+
+run:
+  image:
+    registry: ghcr.io
+    repository: 254carbon/mirror/mlflow-bitnami
+    tag: "bitnami-5.1.17"
+    digest: "sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c"
+    pullPolicy: IfNotPresent
+  initContainers:
+    waitForTracking:
+      image:
+        registry: ghcr.io
+        repository: 254carbon/mirror/os-shell
+        tag: "12-debian-12-r51"
+        digest: "sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857"
+        pullPolicy: IfNotPresent
+
 tracking:
   replicaCount: 1
   host: 0.0.0.0
   ingress:
     enabled: false
+  image:
+    registry: ghcr.io
+    repository: 254carbon/mirror/mlflow-bitnami
+    tag: "bitnami-5.1.17"
+    digest: "sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c"
+    pullPolicy: IfNotPresent
+  initContainers:
+    waitForBackend:
+      image:
+        registry: ghcr.io
+        repository: 254carbon/mirror/os-shell
+        tag: "12-debian-12-r51"
+        digest: "sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857"
+        pullPolicy: IfNotPresent
   resources:
     requests:
       cpu: 400m

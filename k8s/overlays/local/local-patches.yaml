@@ -64,9 +64,10 @@ spec:
   template:
     spec:
       securityContext:
-        runAsNonRoot: false
+        runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
       - name: kafka
         resources:
@@ -82,37 +83,16 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: kafka
-  namespace: data-plane
-spec:
-  template:
-    spec:
-      initContainers:
-      - name: init-permissions-kafka
-        image: busybox:1.36
-        command:
-        - sh
-        - -c
-        - chown -R 1000:1000 /var/lib/kafka/data
-        securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-        volumeMounts:
-        - name: kafka-storage
-          mountPath: /var/lib/kafka/data
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
   name: minio
   namespace: storage
 spec:
   template:
     spec:
       securityContext:
-        runAsNonRoot: false
+        runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
       - name: minio
         resources:
@@ -136,22 +116,10 @@ spec:
   template:
     spec:
       securityContext:
-        runAsNonRoot: false
+        runAsNonRoot: true
         runAsUser: 999
         fsGroup: 999
-      initContainers:
-      - name: init-permissions-postgres
-        image: busybox:1.36
-        command:
-        - sh
-        - -c
-        - chown -R 999:999 /var/lib/postgresql/data
-        securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-        volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
+        fsGroupChangePolicy: OnRootMismatch
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -166,44 +134,10 @@ spec:
         securityContext:
           readOnlyRootFilesystem: false
       securityContext:
-        runAsNonRoot: false
+        runAsNonRoot: true
         runAsUser: 101
         fsGroup: 101
-      initContainers:
-      - name: init-permissions-clickhouse
-        image: busybox:1.36
-        command:
-        - sh
-        - -c
-        - chown -R 101:101 /var/lib/clickhouse
-        securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-        volumeMounts:
-        - name: clickhouse-storage
-          mountPath: /var/lib/clickhouse
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: minio
-  namespace: storage
-spec:
-  template:
-    spec:
-      initContainers:
-      - name: init-permissions-minio
-        image: busybox:1.36
-        command:
-        - sh
-        - -c
-        - chown -R 1000:1000 /data
-        securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-        volumeMounts:
-        - name: minio-storage
-          mountPath: /data
+        fsGroupChangePolicy: OnRootMismatch
 ---
 apiVersion: v1
 kind: Namespace

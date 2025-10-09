@@ -1,0 +1,132 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srestrictprivileges
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRestrictPrivileges
+      validation:
+        openAPIV3Schema:
+          type: object
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |-
+        package k8srestrictprivileges
+
+        dangerous_caps := {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "SYS_RAWIO"}
+
+        workload_specs[spec] {
+          input.review.kind.kind == "Pod"
+          spec := input.review.object.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "Deployment"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "StatefulSet"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "DaemonSet"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "Job"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "CronJob"
+          spec := input.review.object.spec.jobTemplate.spec.template.spec
+        }
+
+        all_containers[container] {
+          spec := workload_specs[_]
+          spec.containers
+          container := spec.containers[_]
+        }
+
+        all_containers[container] {
+          spec := workload_specs[_]
+          spec.initContainers
+          container := spec.initContainers[_]
+        }
+
+        violation[{"msg": "hostPID is not allowed"}] {
+          spec := workload_specs[_]
+          spec.hostPID == true
+        }
+
+        violation[{"msg": "hostIPC is not allowed"}] {
+          spec := workload_specs[_]
+          spec.hostIPC == true
+        }
+
+        violation[{"msg": "hostNetwork is not allowed"}] {
+          spec := workload_specs[_]
+          spec.hostNetwork == true
+        }
+
+        violation[{"msg": sprintf("Container %s must not run privileged", [name])}] {
+          container := all_containers[_]
+          container.securityContext
+          container.securityContext.privileged == true
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s must not add ALL capability", [name])}] {
+          container := all_containers[_]
+          container.securityContext
+          container.securityContext.capabilities
+          container.securityContext.capabilities.add[_] == "ALL"
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s adds forbidden capability %s", [name, cap])}] {
+          container := all_containers[_]
+          container.securityContext
+          container.securityContext.capabilities
+          cap := container.securityContext.capabilities.add[_]
+          dangerous_caps[cap]
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s must not run as root", [name])}] {
+          container := all_containers[_]
+          container.securityContext
+          container.securityContext.runAsUser == 0
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s must define securityContext", [name])}] {
+          container := all_containers[_]
+          not container.securityContext
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s must define resource requests and limits", [name])}] {
+          container := all_containers[_]
+          not container.resources
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s must define resource limits", [name])}] {
+          container := all_containers[_]
+          container.resources
+          not container.resources.limits
+          name := object.get(container, "name", "<container>")
+        }
+
+        violation[{"msg": sprintf("Container %s must define resource requests", [name])}] {
+          container := all_containers[_]
+          container.resources
+          not container.resources.requests
+          name := object.get(container, "name", "<container>")
+        }

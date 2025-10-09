@@ -70,6 +70,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 101
         fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

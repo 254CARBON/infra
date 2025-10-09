@@ -7,23 +7,33 @@ spec:
   generators:
     - list:
         elements:
+          - environment: local
+            overlayPath: infra/k8s/overlays/local
+            targetRevision: HEAD
+            syncWave: "0"
+            promotionSource: none
           - environment: dev
-            overlayPath: k8s/overlays/dev
-          - environment: staging
-            overlayPath: k8s/overlays/staging
+            overlayPath: infra/k8s/overlays/dev
+            targetRevision: main
+            syncWave: "1"
+            promotionSource: local
   template:
     metadata:
       name: infra-{{environment}}
       namespace: argocd
       labels:
         environment: "{{environment}}"
+        gitops.254carbon.io/promotion-tier: "{{environment}}"
+      annotations:
+        argocd.argoproj.io/sync-wave: "{{syncWave}}"
+        gitops.254carbon.io/promotion-source: "{{promotionSource}}"
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
       project: default
       source:
-        repoURL: https://github.com/254CARBON/infra.git
-        targetRevision: HEAD
+        repoURL: https://github.com/254CARBON/carbon.git
+        targetRevision: '{{targetRevision}}'
         path: '{{overlayPath}}'
         directory:
           recurse: true
@@ -35,3 +45,4 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true

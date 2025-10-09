@@ -3,14 +3,19 @@ kind: Application
 metadata:
   name: infra-local
   namespace: argocd
+  labels:
+    environment: local
+    gitops.254carbon.io/promotion-tier: local
+  annotations:
+    gitops.254carbon.io/promotion-source: none
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/254CARBON/infra.git
+    repoURL: https://github.com/254CARBON/carbon.git
     targetRevision: HEAD
-    path: k8s/overlays/local
+    path: infra/k8s/overlays/local
     directory:
       recurse: true
   destination:
@@ -21,3 +26,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

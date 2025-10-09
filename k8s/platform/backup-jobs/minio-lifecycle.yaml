@@ -25,10 +25,21 @@ spec:
             runAsNonRoot: true
             runAsUser: 1001
             fsGroup: 1001
+            fsGroupChangePolicy: OnRootMismatch
           containers:
           - name: minio-client
             image: bitnami/minio-client:2024.3.7
             imagePullPolicy: IfNotPresent
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 1001
+              capabilities:
+                drop:
+                - ALL
+              seccompProfile:
+                type: RuntimeDefault
             command:
             - /bin/sh
             - -c

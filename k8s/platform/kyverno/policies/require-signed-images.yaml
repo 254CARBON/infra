@@ -1,0 +1,43 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-signed-images
+  annotations:
+    policy.254carbon.com/description: Require Sigstore keyless signatures for workload images
+spec:
+  validationFailureAction: Enforce
+  background: false
+  failurePolicy: Fail
+  webhookTimeoutSeconds: 20
+  rules:
+    - name: verify-image-signatures
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+                - Deployment
+                - StatefulSet
+                - DaemonSet
+                - Job
+                - CronJob
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kyverno
+                - kube-system
+                - gatekeeper-system
+                - trivy-system
+      verifyImages:
+        - imageReferences:
+            - ghcr.io/254carbon/*
+          mutateDigest: true
+          verifyDigest: true
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subjectRegExp: "https://github.com/254carbon/.+"
+                    rekor:
+                      url: https://rekor.sigstore.dev

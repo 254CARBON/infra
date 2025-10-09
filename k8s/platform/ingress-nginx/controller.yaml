@@ -26,6 +26,7 @@ data:
   proxy-send-timeout: "300"
   rate-limit: "100"
   rate-limit-window: "1m"
+  worker-processes: "1"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -226,7 +227,7 @@ metadata:
     app.kubernetes.io/component: controller
     app.kubernetes.io/part-of: "254carbon"
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/component: controller
@@ -234,9 +235,11 @@ spec:
     - name: http
       port: 80
       targetPort: http
+      nodePort: 30080
     - name: https
       port: 443
       targetPort: https
+      nodePort: 30443
     - name: metrics
       port: 10254
       targetPort: metrics
@@ -359,11 +362,11 @@ spec:
             runAsNonRoot: true
           resources:
             requests:
-              cpu: 250m
-              memory: 384Mi
+              cpu: 300m
+              memory: 512Mi
             limits:
-              cpu: 500m
-              memory: 768Mi
+              cpu: 1
+              memory: 1536Mi
       securityContext:
         fsGroup: 101
         runAsNonRoot: true

@@ -14,12 +14,18 @@ resources:
   - ../../platform/otel
   - ../../platform/ingress-nginx
   - ../../platform/backup-jobs
+  - ../../platform/backports
+  - ../../platform/kyverno
+  - ../../platform/gatekeeper
+  - ../../platform/trivy-operator
 
 labels:
   - pairs:
       environment: staging
-      app.kubernetes.io/part-of: "254carbon"
       app.kubernetes.io/managed-by: "kustomize"
 
 patches:
   - path: staging-patches.yaml
+
+patchesStrategicMerge:
+  - argocd-labels.yaml

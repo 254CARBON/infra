@@ -14,13 +14,20 @@ resources:
   - ../../platform/otel
   - ../../platform/ingress-nginx
   - ../../platform/backup-jobs
+  - ../../platform/backports
+  - ../../platform/kyverno
+  - ../../platform/gatekeeper
+  - ../../platform/trivy-operator
+  - ../../platform/argocd
   - additional-secrets.yaml
 
 labels:
   - pairs:
       environment: local
-      app.kubernetes.io/part-of: "254carbon"
       app.kubernetes.io/managed-by: "kustomize"
 
 patches:
   - path: local-patches.yaml
+
+patchesStrategicMerge:
+  - argocd-labels.yaml

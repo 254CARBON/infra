@@ -213,7 +213,7 @@ spec:
       initContainers:
         # Wait for tracking service
         - name: wait-for-tracking
-          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          image: ghcr.io/254carbon/mirror/os-shell@sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -279,7 +279,7 @@ spec:
               memory: 512Mi
       containers:
         - name: mlflow
-          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          image: ghcr.io/254carbon/mirror/mlflow-bitnami@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
           imagePullPolicy: "IfNotPresent"
           securityContext:
             allowPrivilegeEscalation: false
@@ -410,7 +410,7 @@ spec:
       initContainers:
         # Init container for PostgreSQL
         - name: wait-for-database
-          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          image: ghcr.io/254carbon/mirror/os-shell@sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -476,7 +476,7 @@ spec:
               memory: 512Mi
         # Render basic auth configuration
         - name: get-default-auth-conf
-          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          image: ghcr.io/254carbon/mirror/mlflow-bitnami@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -510,7 +510,7 @@ spec:
               cpu: 400m
               memory: 512Mi
         - name: render-auth-conf
-          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          image: ghcr.io/254carbon/mirror/os-shell@sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -579,7 +579,7 @@ spec:
               memory: 512Mi
         # Perform upgrade of the Auth Database
         - name: upgrade-db-auth
-          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          image: ghcr.io/254carbon/mirror/mlflow-bitnami@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -621,7 +621,7 @@ spec:
               memory: 512Mi
         # Wait for S3 backend to be ready
         - name: wait-for-s3
-          image: docker.io/bitnami/os-shell:12-debian-12-r51
+          image: ghcr.io/254carbon/mirror/os-shell@sha256:028f4ddeecd0edbe82884513e2bd14268fdc8b04899a826bd840521949700857
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -687,7 +687,7 @@ spec:
               memory: 512Mi
       containers:
         - name: mlflow
-          image: registry-1.docker.io/bitnamicharts/mlflow@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
+          image: ghcr.io/254carbon/mirror/mlflow-bitnami@sha256:590fd5ec61f17efa7d8fa9968791cfd85809763c79a589b58c2519d9a303a94c
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

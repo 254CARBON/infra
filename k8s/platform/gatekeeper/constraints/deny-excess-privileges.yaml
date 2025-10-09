@@ -1,0 +1,22 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRestrictPrivileges
+metadata:
+  name: deny-excess-privileges
+  annotations:
+    policy.254carbon.com/description: Enforce restricted pod security profile (no privileged or host-level escalation)
+spec:
+  match:
+    excludedNamespaces:
+      - gatekeeper-system
+      - kube-system
+      - trivy-system
+      - kyverno
+      - local-path-storage
+      - projection-test
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "DaemonSet", "StatefulSet"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]

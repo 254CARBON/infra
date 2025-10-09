@@ -31,6 +31,11 @@ spec:
         app.kubernetes.io/part-of: "254carbon"
     spec:
       serviceAccountName: ingress-nginx-default-backend
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65535
+        fsGroup: 65535
+        fsGroupChangePolicy: OnRootMismatch
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -53,6 +58,14 @@ spec:
         - name: default-backend
           image: registry.k8s.io/defaultbackend-amd64:1.5
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65535
+            capabilities:
+              drop:
+              - ALL
           ports:
             - containerPort: 8080
               name: http

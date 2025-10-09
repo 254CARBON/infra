@@ -16,6 +16,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: mlflow
+            name: mlflow-tracking
             port:
               name: http

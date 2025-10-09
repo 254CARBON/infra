@@ -1,0 +1,49 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: validatingadmissionpolicies.admissionregistration.k8s.io
+  annotations:
+    backport.254carbon.com/origin-version: "k8s-1.27"
+    api-approved.kubernetes.io: "https://github.com/kubernetes/enhancements/pull/3716"
+spec:
+  group: admissionregistration.k8s.io
+  scope: Cluster
+  names:
+    plural: validatingadmissionpolicies
+    singular: validatingadmissionpolicy
+    kind: ValidatingAdmissionPolicy
+    shortNames:
+      - vap
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: validatingadmissionpolicybindings.admissionregistration.k8s.io
+  annotations:
+    backport.254carbon.com/origin-version: "k8s-1.27"
+    api-approved.kubernetes.io: "https://github.com/kubernetes/enhancements/pull/3716"
+spec:
+  group: admissionregistration.k8s.io
+  scope: Cluster
+  names:
+    plural: validatingadmissionpolicybindings
+    singular: validatingadmissionpolicybinding
+    kind: ValidatingAdmissionPolicyBinding
+    shortNames:
+      - vapb
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true

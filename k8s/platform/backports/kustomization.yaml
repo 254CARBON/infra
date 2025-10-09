@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: "254carbon"
+  platform.254carbon.com/component: admission-backports
+
+resources:
+  - validating-admission-policy-crds.yaml

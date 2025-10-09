@@ -65,21 +65,33 @@ spec:
             'controller.quorum.voters=1@127.0.0.1:9093' \
             'listeners=PLAINTEXT://:9092,CONTROLLER://:9093' \
             'inter.broker.listener.name=PLAINTEXT' \
+            'controller.listener.names=CONTROLLER' \
+            'listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT' \
             'log.dirs=/var/lib/kafka/data' \
             > "$CFG"
           echo "[kafka-init] Formatting storage with cluster id: ${CLUSTER_ID}"
           kafka-storage format -t "$CLUSTER_ID" -c "$CFG"
           # clean up any stale subdirs created by previous attempts
           rm -rf /var/lib/kafka/data/logs || true
-          chown -R 1000:1000 /var/lib/kafka/data || true
         env:
         - name: CLUSTER_ID
           value: "MkU3OEVBNTcwNTJENDM2Qk"
         - name: KAFKA_CLUSTER_ID
           value: "MkU3OEVBNTcwNTJENDM2Qk"
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
         volumeMounts:
         - name: kafka-storage
           mountPath: /var/lib/kafka/data
@@ -87,6 +99,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -135,6 +148,14 @@ spec:
           value: "9999"
         - name: KAFKA_LOG4J_OPTS
           value: "-Dlog4j.configuration=file:/etc/kafka/log4j-console.properties"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - name: kafka-storage
           mountPath: /var/lib/kafka/data

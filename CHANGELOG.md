@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Terraform modules for core platform components
 - Kubernetes base manifests and overlays
 - OPA policies for security enforcement
+- Gatekeeper admission controller, Kyverno signature policy, and Trivy Operator for cluster security scanning
 - Backup and restore scripts
 
 ### Changed

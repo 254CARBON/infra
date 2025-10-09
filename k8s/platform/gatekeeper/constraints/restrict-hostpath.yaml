@@ -1,0 +1,22 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRestrictHostPath
+metadata:
+  name: restrict-hostpath
+  annotations:
+    policy.254carbon.com/description: Block hostPath usage except for approved platform paths
+spec:
+  match:
+    excludedNamespaces:
+      - gatekeeper-system
+      - kube-system
+      - trivy-system
+      - kyverno
+      - local-path-storage
+      - projection-test
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "DaemonSet", "StatefulSet"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]

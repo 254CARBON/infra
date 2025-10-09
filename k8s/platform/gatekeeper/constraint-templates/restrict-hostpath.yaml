@@ -1,0 +1,76 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srestricthostpath
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRestrictHostPath
+      validation:
+        openAPIV3Schema:
+          type: object
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |-
+        package k8srestricthostpath
+
+        allowed_hostpaths := {
+          "/var/lib/rancher/k3s/storage",
+          "/var/local-path-provisioner",
+          "/opt/local-path-provisioner",
+          "/var/log",
+          "/tmp",
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "Pod"
+          spec := input.review.object.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "Deployment"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "StatefulSet"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "DaemonSet"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "Job"
+          spec := input.review.object.spec.template.spec
+        }
+
+        workload_specs[spec] {
+          input.review.kind.kind == "CronJob"
+          spec := input.review.object.spec.jobTemplate.spec.template.spec
+        }
+
+        workload_volumes[volume] {
+          spec := workload_specs[_]
+          spec.volumes
+          volume := spec.volumes[_]
+        }
+
+        violation[{"msg": sprintf("Volume %s uses disallowed hostPath %s", [name, path])}] {
+          volume := workload_volumes[_]
+          volume.hostPath
+          hostpath := volume.hostPath
+          path := object.get(hostpath, "path", "")
+          not allowed_hostpaths[path]
+          name := object.get(volume, "name", "<volume>")
+        }
+
+        violation[{"msg": sprintf("Volume %s must not use hostPath", [name])}] {
+          volume := workload_volumes[_]
+          volume.hostPath
+          not volume.hostPath.path
+          name := object.get(volume, "name", "<volume>")
+        }

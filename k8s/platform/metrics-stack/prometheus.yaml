@@ -21,6 +21,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
         fsGroup: 65534
+        fsGroupChangePolicy: OnRootMismatch
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -50,6 +51,14 @@ spec:
       - name: prometheus
         image: prom/prometheus:latest
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          capabilities:
+            drop:
+            - ALL
         ports:
         - name: web
           containerPort: 9090

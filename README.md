@@ -168,6 +168,9 @@ Logical Layers:
       metrics-stack/
       otel/
       backup-jobs/
+      gatekeeper/
+      kyverno/
+      trivy-operator/
     overlays/
       local/
       dev/
@@ -210,9 +213,11 @@ Logical Layers:
 | Environment | Purpose | Execution Mode | Promotion Source |
 |-------------|---------|---------------|------------------|
 | local | Primary dev & experimentation | kind/k3d + host processes | N/A |
-| dev (future) | Shared integration | Real K8s cluster | Tagged infra modules |
+| dev | Shared integration | Real K8s cluster | ArgoCD (main branch promoted from local) |
 | staging (future) | Pre‑prod validation | Real K8s | dev after drift-free |
 | prod (future) | Mission operation | Multi-region | staging after SLO stable |
+
+ArgoCD now continuously reconciles the `local` and `dev` overlays. Local clusters track the repository `HEAD` so you can iterate quickly; merging to `main` promotes those manifests to `dev`, where an `infra-dev` application follows the branch automatically.
 
 Local clusters rely on the Rancher `local-path` CSI provisioner (works for both kind and k3d). Staging/prod will migrate to network-attached or SSD-backed PV classes.
 
@@ -255,6 +260,9 @@ Taints (optional):
 | ingestion | Airflow / connectors / seatunnel (if running here) |
 | observability | Prometheus, Grafana, Loki (if added), OTel collector |
 | security | Policy controllers, OPA |
+| gatekeeper-system | Gatekeeper controller enforcing admission OPA policies |
+| kyverno | Image signature verification (cosign policy enforcement) |
+| trivy-system | Trivy Operator for runtime & workload vulnerability scanning |
 | backup | Backup jobs & retention logic |
 
 Network Policies: Default deny east-west except required ports & explicit allowances.
@@ -319,12 +327,19 @@ Two Options (choose one or dual):
 | Approach | Tool | Pros | Cons |
 |----------|------|------|------|
 | Push-based | `make apply` + kubectl | Simple, direct | Harder audit |
-| Pull-based (recommended future) | ArgoCD or Flux | Drift detection, rollback | Initial overhead |
+| Pull-based (default local/dev) | ArgoCD | Drift detection, rollback, promotion audit trail | Controller + repo credentials required |
 
-Suggested Transition:
-1. Phase 1: Manual `kubectl apply -k k8s/overlays/local`.
-2. Phase 2: Introduce ArgoCD pointing at environment overlay directory.
-3. Phase 3: ArgoCD ApplicationSet for multi-environment expansions.
+Current GitOps workflow (see `docs/gitops-argocd.md` for deep dive):
+1. `make k8s-apply-platform` deploys the platform stack plus ArgoCD (`platform/argocd`).
+2. Application `infra-local` tracks `infra/k8s/overlays/local` at `HEAD`; `infra-dev` (ApplicationSet) tracks `infra/k8s/overlays/dev` at `main`.
+3. Promotion = merge infra changes to `main`; ArgoCD reconciles `infra-dev`. Use `argocd app sync infra-dev` for an immediate rollout.
+
+Access the ArgoCD UI locally:
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+argocd login localhost:8080 --username admin --password "$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+```
+Manual `kubectl apply -k` stays as a breakout lever for experiments or emergency fixes; document any direct changes and backfill them through Git to avoid drift.
 
 ---
 
@@ -535,6 +550,7 @@ Scripts:
 - `apply_all.sh`: Ordered apply (base → data → platform).
 - `verify.sh`: Validates storage classes and checks critical endpoints/liveness.
 - `backup_clickhouse.sh`: Manual snapshot invoker.
+- `mirror_mlflow_images.sh`: Mirrors Bitnami MLflow + helper images into `ghcr.io/254carbon/mirror/*` so clusters avoid Docker Hub pulls.
 
 ---
 
@@ -666,7 +682,7 @@ For the full incident triage playbook, see `docs/troubleshooting-runbook.md`.
 |-----------|-------------|--------|
 | M1 | Baseline local cluster automation | In progress |
 | M2 | Policy enforcement (OPA advisory) | Planned |
-| M3 | GitOps introduction (ArgoCD) | Planned |
+| M3 | GitOps introduction (ArgoCD) | In progress (local/dev live) |
 | M4 | HA data services prototype (ClickHouse replicated) | Future |
 | M5 | Observability: full log aggregation (Loki) | Future |
 | M6 | Security scanning integration (Trivy + Cosign) | Future |

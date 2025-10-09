@@ -9,6 +9,9 @@ resources:
   - application-local.yaml
   - applicationset-environments.yaml
 
+patchesStrategicMerge:
+  - resource-requests.yaml
+
 labels:
   - pairs:
       tier: platform

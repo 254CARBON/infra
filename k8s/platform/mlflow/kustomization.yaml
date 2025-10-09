@@ -13,3 +13,6 @@ labels:
       app.kubernetes.io/part-of: "254carbon"
       tier: platform
       domain: ml
+
+patchesStrategicMerge:
+  - sa-imagepullsecrets.yaml
