@@ -12,11 +12,6 @@ spec:
             targetRevision: main
             syncWave: "0"
             promotionSource: none
-          - environment: dev
-            overlayPath: k8s/overlays/dev
-            targetRevision: main
-            syncWave: "1"
-            promotionSource: local
   template:
     metadata:
       name: infra-{{environment}}
