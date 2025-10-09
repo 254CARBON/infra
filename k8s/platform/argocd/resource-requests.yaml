@@ -159,7 +159,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: ARGOCD_EXEC_TIMEOUT
-              value: "180"
+              value: "600"
           resources:
             requests:
               cpu: 250m
