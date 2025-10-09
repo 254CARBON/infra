@@ -31,6 +31,12 @@ spec:
         targetRevision: '{{targetRevision}}'
         path: '{{overlayPath}}'
         kustomize: {}
+      ignoreDifferences:
+        - group: apiextensions.k8s.io
+          kind: CustomResourceDefinition
+          jsonPointers:
+            - /metadata/annotations
+            - /status
       destination:
         server: https://kubernetes.default.svc
       syncPolicy:

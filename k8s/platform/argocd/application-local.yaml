@@ -16,6 +16,12 @@ spec:
     repoURL: git://git-mirror.argocd.svc.cluster.local/infra.git
     targetRevision: main
     path: k8s/overlays/local
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/annotations
+        - /status
     kustomize: {}
   destination:
     server: https://kubernetes.default.svc
