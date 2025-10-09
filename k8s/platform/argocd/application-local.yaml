@@ -13,9 +13,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/254CARBON/carbon.git
-    targetRevision: HEAD
-    path: infra/k8s/overlays/local
+    repoURL: git://git-mirror.argocd.svc.cluster.local/infra.git
+    targetRevision: main
+    path: k8s/overlays/local
     directory:
       recurse: true
   destination:
