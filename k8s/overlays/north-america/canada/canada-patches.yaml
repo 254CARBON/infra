@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-queue-worker
+spec:
+  replicas: 3
+  template:
+    spec:
+      nodeSelector:
+        region: canada
+      tolerations:
+      - key: region
+        operator: Equal
+        value: canada
+        effect: NoSchedule
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-queue-monitor
+spec:
+  replicas: 1
+  template:
+    spec:
+      nodeSelector:
+        region: canada
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: job-queue-config
+data:
+  MAX_WORKERS: "8"
+  JOB_TIMEOUT: "7200"

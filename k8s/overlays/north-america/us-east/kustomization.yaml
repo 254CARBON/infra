@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: platform-core
+
+bases:
+  - ../../../base
+
+patchesStrategicMerge:
+  - us-east-patches.yaml
+
+images:
+  - name: 254carbon/job-queue-worker
+    newTag: us-east-latest
+  - name: 254carbon/job-queue-monitor
+    newTag: us-east-latest
+
+configMapGenerator:
+  - name: region-config
+    literals:
+      - REGION=us-east
+      - AWS_REGION=us-east-1
+      - AZURE_REGION=eastus
+      - GCP_REGION=us-east1
+      - MARKETS=pjme,miso,spp,ercot,nyiso,isone
+      - TIMEZONE=America/New_York
+      - DATA_RETENTION_DAYS=2555
+
+commonLabels:
+  region: us-east
+  carbon.markets: pjme,miso,spp,ercot,nyiso,isone

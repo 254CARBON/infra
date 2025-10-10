@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-queue-worker
+  labels:
+    app.kubernetes.io/name: job-queue-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: carbon-platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: job-queue-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: job-queue-worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: carbon-platform
+    spec:
+      containers:
+      - name: worker
+        image: 254carbon/job-queue-worker:latest
+        env:
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: REDIS_PORT
+        - name: REDIS_DB
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: REDIS_DB
+        - name: JOB_QUEUE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: JOB_QUEUE_NAME
+        - name: MAX_WORKERS
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: MAX_WORKERS
+        - name: RETRY_ATTEMPTS
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: RETRY_ATTEMPTS
+        - name: RETRY_DELAY
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: RETRY_DELAY
+        - name: JOB_TIMEOUT
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: JOB_TIMEOUT
+        - name: PREEMPTION_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: job-queue-config
+              key: PREEMPTION_ENABLED
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: job-queue-worker
+  labels:
+    app.kubernetes.io/name: job-queue-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: carbon-platform
+spec:
+  selector:
+    app.kubernetes.io/name: job-queue-worker
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: http
+  type: ClusterIP

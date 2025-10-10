@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: platform-core
+
+bases:
+  - ../../../base
+
+patchesStrategicMerge:
+  - us-west-patches.yaml
+
+images:
+  - name: 254carbon/job-queue-worker
+    newTag: us-west-latest
+  - name: 254carbon/job-queue-monitor
+    newTag: us-west-latest
+
+configMapGenerator:
+  - name: region-config
+    literals:
+      - REGION=us-west
+      - AWS_REGION=us-west-2
+      - AZURE_REGION=westus2
+      - GCP_REGION=us-west1
+      - MARKETS=wecc,caiso
+      - TIMEZONE=America/Los_Angeles
+      - DATA_RETENTION_DAYS=2555
+
+commonLabels:
+  region: us-west
+  carbon.markets: wecc,caiso

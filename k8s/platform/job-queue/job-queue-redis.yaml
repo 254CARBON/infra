@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-queue-redis
+  labels:
+    app.kubernetes.io/name: job-queue-redis
+    app.kubernetes.io/component: redis
+    app.kubernetes.io/part-of: carbon-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: job-queue-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: job-queue-redis
+        app.kubernetes.io/component: redis
+        app.kubernetes.io/part-of: carbon-platform
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: job-queue-redis-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: job-queue-redis
+  labels:
+    app.kubernetes.io/name: job-queue-redis
+    app.kubernetes.io/component: redis
+    app.kubernetes.io/part-of: carbon-platform
+spec:
+  selector:
+    app.kubernetes.io/name: job-queue-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: redis
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: job-queue-redis-pvc
+  labels:
+    app.kubernetes.io/name: job-queue-redis
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: carbon-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard-local

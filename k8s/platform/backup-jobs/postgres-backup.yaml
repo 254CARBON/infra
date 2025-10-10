@@ -27,7 +27,7 @@ spec:
             fsGroupChangePolicy: OnRootMismatch
           containers:
           - name: postgres-backup
-            image: bitnami/postgresql:15
+            image: bitnami/postgresql:latest
             imagePullPolicy: IfNotPresent
             securityContext:
               allowPrivilegeEscalation: false

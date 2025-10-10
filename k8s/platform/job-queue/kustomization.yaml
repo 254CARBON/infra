@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: platform-core
+
+resources:
+  - job-queue-redis.yaml
+  - job-queue-worker.yaml
+  - job-queue-monitor.yaml
+
+images:
+  - name: redis
+    newTag: 7.2-alpine
+
+configMapGenerator:
+  - name: job-queue-config
+    literals:
+      - REDIS_HOST=job-queue-redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - JOB_QUEUE_NAME=carbon-jobs
+      - MAX_WORKERS=10
+      - RETRY_ATTEMPTS=3
+      - RETRY_DELAY=60
+      - JOB_TIMEOUT=3600
+      - PREEMPTION_ENABLED=true
+
+commonLabels:
+  app.kubernetes.io/name: job-queue
+  app.kubernetes.io/component: queue
+  app.kubernetes.io/part-of: carbon-platform
