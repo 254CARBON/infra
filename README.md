@@ -1,726 +1,135 @@
-# 254Carbon Infrastructure (`254carbon-infra`)
+# Infrastructure (`254carbon-infra`)
 
-> Infrastructure-as-Code (IaC) and environment orchestration for the 254Carbon platform.  
-> Designed for a staged evolution: **local heterogeneous cluster (Linux x86 + macOS ARM w/ GPU)** → **hybrid multi-host** → **future cloud or multi-region**.
+> Infrastructure-as-code, cluster bootstrap, and platform dependencies for 254Carbon across local, dev, staging, and production environments.
 
----
-
-## Quick Start
-
-```bash
-# 1. Bootstrap k3d multi-node cluster (default)
-make k3d-up
-
-# 2. Apply base (namespaces, RBAC, policies)
-make k8s-apply-base
-
-# 3. Deploy data + platform dependencies
-make k8s-apply-platform
-
-# 4. Verify critical services
-make verify
-
-# 5. Tear down (clean)
-make k3d-down
-```
-
-Prefer kind for local testing? Swap the bootstrap/teardown commands:
-
-```bash
-make kind-up
-# ...
-make kind-down
-```
-
-Or reuse the aggregated targets with `CLUSTER_PROVIDER=kind make cluster-up` and `CLUSTER_PROVIDER=kind make cluster-down`.
+Reference: [Platform Overview](../PLATFORM_OVERVIEW.md)
 
 ---
 
-## Table of Contents
-- [Quick Start](#quick-start)
-- [1. Vision & Principles](#1-vision--principles)
-- [2. Scope & Non-Scope](#2-scope--non-scope)
-- [3. Architecture Overview](#3-architecture-overview)
-- [4. Repository Structure](#4-repository-structure)
-- [5. Environments & Promotion Model](#5-environments--promotion-model)
-- [6. Local Cluster (3-Node Hybrid)](#6-local-cluster-3-node-hybrid)
-- [7. Kubernetes Layout & Namespaces](#7-kubernetes-layout--namespaces)
-- [8. Core Platform Components](#8-core-platform-components)
-- [9. Terraform Module Design](#9-terraform-module-design)
-- [10. GitOps & Deployment Flow](#10-gitops--deployment-flow)
-- [11. Secrets & Configuration Management](#11-secrets--configuration-management)
-- [12. Networking & Ingress Topology](#12-networking--ingress-topology)
-- [13. Storage, Persistence & Data Classes](#13-storage-persistence--data-classes)
-- [14. Backup & Restore Strategy](#14-backup--restore-strategy)
-- [15. Observability Integration (Metrics, Logs, Traces)](#15-observability-integration-metrics-logs-traces)
-- [16. Security & Policy Enforcement](#16-security--policy-enforcement)
-- [17. Multi-Arch & Heterogeneous Scheduling](#17-multi-arch--heterogeneous-scheduling)
-- [18. Resource Naming & Tagging Conventions](#18-resource-naming--tagging-conventions)
-- [19. Automation Scripts & Make Targets](#19-automation-scripts--make-targets)
-- [20. CI/CD Pipeline (Infra Changes)](#20-cicd-pipeline-infra-changes)
-- [21. Drift Detection & Guard Rails](#21-drift-detection--guard-rails)
-- [22. Disaster Recovery & Resilience (Roadmap)](#22-disaster-recovery--resilience-roadmap)
-- [23. Cost / Resource Footprint Awareness (Local)](#23-cost--resource-footprint-awareness-local)
-- [24. Future Cloud Migration Blueprint](#24-future-cloud-migration-blueprint)
-- [25. Contribution Workflow](#25-contribution-workflow)
-- [26. Troubleshooting Matrix](#26-troubleshooting-matrix)
-- [27. Roadmap](#27-roadmap)
-- [28. Changelog Template](#28-changelog-template)
-- [29. License / Ownership](#29-license--ownership)
+## Scope
+- Provision local multi-node Kubernetes clusters (kind/k3d) for development and integration.
+- Manage Kustomize overlays, Terraform stacks, and platform dependencies (Kafka, ClickHouse, Redis, Keycloak, MinIO, etc.).
+- Apply baseline security (RBAC, NetworkPolicies, PodSecurity, OPA/Conftest) and observability hooks.
+- Provide scripts for backups, drift detection, and node labeling.
+
+Out of scope: application code deployment (handled by service repos) and cloud-provider specific production IaC beyond the included Terraform scaffolding.
 
 ---
 
-## 1. Vision & Principles
-
-| Principle | Description |
-|-----------|-------------|
-| Reproducibility | Complete platform standing up from scratch with a single command. |
-| Incremental Evolution | Start local; modules already cloud‑ready in structure. |
-| Explicit Boundaries | Clear separation: base infra vs platform services vs data stores. |
-| Observability Default | Every component exported metrics/logs/traces from day one. |
-| Ephemerality for Dev | Non‑critical services can be torn down & rebuilt quickly. |
-| Idempotency | Repeated applies produce no drift. |
-| Policy as Code | Security & guardrails shift-left (OPA/Conftest). |
-| Multi-Arch Awareness | ARM + AMD64 images & node targeting built-in. |
+## Repository Structure
+- `k8s/base/` – Namespaces, RBAC, storage classes, network policies, pod security defaults.
+- `k8s/overlays/<env>/` – Environment-specific overlays for platform components.
+- `terraform/` – Modular stacks for local and hybrid setups (`terraform/stacks/local`).
+- `scripts/` – Cluster bootstrap (`kind_bootstrap.sh`, `k3d_bootstrap.sh`), verification, backups, node labeling, teardown.
+- `policies/` – OPA/Conftest rules enforcing guard rails (no hostPath, limited capabilities, etc.).
+- `helm/` – Shared charts or value overrides (when services choose helm packaging).
+- `Makefile` – Entry points for cluster lifecycle, validation, backup, drift detection.
 
 ---
 
-## 2. Scope & Non-Scope
+## Environments
 
-### In Scope
-- Terraform scaffolding (even if local execution is partial).
-- Kubernetes cluster bootstrap (kind/k3d + manifest layering).
-- Namespaces, RBAC, NetworkPolicies, storage classes.
-- Deployment templates for: ClickHouse, PostgreSQL, Redis, Kafka, MinIO, Keycloak, MLflow, OTel Collector, Prometheus stack.
-- GitOps integration hooks (ArgoCD/Flux optional).
-- Backup job specs (ClickHouse + Postgres + MinIO lifecycle).
-- Security baseline (pod security, resource quotas, minimal privileges).
-- Multi-arch build + scheduling strategies.
+| Environment | Bootstrap | Notes |
+|-------------|-----------|-------|
+| `local` | `make dev-setup` (`cluster-up`, `k8s-apply-base`, `k8s-apply-platform`, `verify`) | Multi-node kind/k3d with heterogeneous scheduling (x86 + arm affinity labels). |
+| `dev` | `CLUSTER_PROVIDER=k3d make cluster-up` followed by `make k8s-apply-base k8s-apply-platform` | Shared integration; smaller resource requests, mock secrets, shorter retention. |
+| `staging` | GitOps (Flux/Argo) applies `k8s/overlays/staging`; Terraform stack `terraform/stacks/hybrid` seeds infra | Mirrors production topology; used for load/SLO rehearsals. |
+| `production` | Future cloud modules (AWS/GCP) + GitOps overlays | Requires IaC approval workflow, backup/restore jobs enabled, mTLS enforced. |
 
-### Out of Scope
-- Application business logic (see other repos).
-- Individual service Helm charts (reside in their own repos or a shared chart repo).
-- Cloud provider provisioning (future layers will add AWS / GCP modules).
+Environment selection controlled via `CLUSTER_PROVIDER` and overlay path variables. Secrets for non-local environments are sealed and maintained outside this repo.
 
 ---
 
-## 3. Architecture Overview
+## Runbook
 
-Logical Layers:
+### Daily / Pre-Deploy Checks
+- `make verify` – runs cluster health script (checks API server, node status, core addons).
+- Ensure drift free: `make drift-check` (kustomize diff + terraform plan) should return no unexpected changes.
+- Monitor backing services (ClickHouse, Postgres, Redis, Kafka) via `kubectl get pods -n platform-data`.
 
-```text
-┌─────────────────────────────────────────────┐
-│ Access Layer (Ingress / Gateway / Streaming)│
-├─────────────────────────────────────────────┤
-│ Core Platform Services (Auth, Entitlements, │
-│ Metrics, Normalization, ML, Search, etc.)   │
-├─────────────────────────────────────────────┤
-│ Data Services (PostgreSQL, ClickHouse,      │
-│ Redis, Kafka, MinIO, Vector Store)          │
-├─────────────────────────────────────────────┤
-│ Infra Control Plane (K8s API, Certs,        │
-│ CNI, StorageClasses, Monitoring Stack)      │
-├─────────────────────────────────────────────┤
-│ Host Layer (Linux x86 node, 2 × macOS ARM)  │
-└─────────────────────────────────────────────┘
-```
+### Cluster Lifecycle
+- **Bootstrap local cluster**: `make dev-setup` (creates cluster, applies base + platform, verification).
+- **Tear down**: `make dev-teardown`.
+- **Change cluster provider**: `CLUSTER_PROVIDER=k3d make dev-setup`.
 
----
+### Applying Platform Changes
+1. Update manifests (kustomize, helm) or Terraform modules.
+2. `make validate` – kustomize build, terraform validate, kubeconform schema checks, conftest policies.
+3. `make k8s-apply-base` (if base resources changed) then `make k8s-apply-platform`.
+4. Run `make verify` and targeted smoke tests from dependent repos (e.g., `../access`, `../ingestion`).
 
-## 4. Repository Structure
+### Backups
+- Trigger manual backups for ClickHouse/Postgres/MinIO: `make backup-run` (invokes `scripts/backup_clickhouse.sh` and related helpers).
+- Schedule CronJobs defined under `k8s/base/backup-jobs/` for automatic execution.
+- Store artifacts in configured persistent volumes or remote storage (configure in Terraform outputs).
 
-```text
-/
-  terraform/
-    modules/
-      k8s_cluster/
-      clickhouse/
-      postgresql/
-      redis/
-      kafka/
-      minio/
-      keycloak/
-      mlflow/
-      observability/
-      storage/
-    stacks/
-      local/
-        main.tf
-        variables.tf
-        outputs.tf
-      hybrid/
-        main.tf
-  k8s/
-    base/
-      namespaces/
-      storageclasses/
-      rbac/
-      network-policies/
-      podsecurity/
-    platform/
-      clickhouse/
-      postgresql/
-      redis/
-      kafka/
-      minio/
-      keycloak/
-      mlflow/
-      metrics-stack/
-      otel/
-      backup-jobs/
-      gatekeeper/
-      kyverno/
-      trivy-operator/
-    overlays/
-      local/
-      dev/
-      staging/ (future placeholder)
-  helm/ (optional umbrella or value overrides)
-  scripts/
-    kind_bootstrap.sh
-    k3d_bootstrap.sh
-    label_nodes.sh
-    apply_all.sh
-    teardown.sh
-    verify.sh
-    backup_clickhouse.sh
-    restore_clickhouse.sh
-    rotate_secrets.sh
-  policies/
-    opa/
-      deny-excess-privileges.rego
-      restrict-hostpath.rego
-    conftest/
-  config/
-    cluster-config.yaml
-    kind-cluster.yaml
-    k3d-cluster.yaml
-    ingress-values.yaml
-  manifests/
-    (Generated or static compiled configs)
-  backups/
-    (Metadata, not actual dumps)
-  Makefile
-  .agent/context.yaml
-  README.md
-  CHANGELOG.md
-```
+### Emergency Response
+- **Control plane down**: check Docker/k3d status; restart cluster via `make cluster-down && make cluster-up`; restore from etcd snapshot if available.
+- **Stateful service data loss**: restore using scripts in `scripts/restore_*` (coming soon) after confirming backups.
+- **Security incident**: run `policies/opa` audits (`make validate`) and rotate secrets via `scripts/rotate_secrets.sh`.
+- **Resource exhaustion**: inspect `kubectl top nodes` and adjust quotas/limits in overlay values; scale node pool via Terraform (hybrid or cloud).
 
 ---
 
-## 5. Environments & Promotion Model
+## Configuration
 
-| Environment | Purpose | Execution Mode | Promotion Source |
-|-------------|---------|---------------|------------------|
-| local | Primary dev & experimentation | kind/k3d + host processes | N/A |
-| dev | Shared integration | Real K8s cluster | ArgoCD (main branch promoted from local) |
-| staging (future) | Pre‑prod validation | Real K8s | dev after drift-free |
-| prod (future) | Mission operation | Multi-region | staging after SLO stable |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CLUSTER_PROVIDER` | Cluster runtime (`kind` or `k3d`) | `kind` |
+| `CLUSTER_NAME` | Local cluster identifier | `local-254carbon` |
+| `KUSTOMIZE_DIR` | Overlay applied for platform components | `k8s/overlays/local` |
+| `TERRAFORM_DIR` | Active Terraform stack | `terraform/stacks/local` |
+| `KUBECONFORM_FLAGS` | Schema validation flags | `-strict -ignore-missing-schemas -summary` |
+| `CONTFEST_POLICY_DIR` | OPA policy directory | `policies/opa` |
+| `STORAGE_CLASS_DEFAULT` | Storage class defined in `k8s/base/storageclasses/` | `standard` (uses hostPath for kind) |
+| `BACKUP_BUCKET` | Target bucket for backups (set via Terraform vars) | empty (configure per env) |
 
-ArgoCD now continuously reconciles the `local` and `dev` overlays. Local clusters track the repository `HEAD` so you can iterate quickly; merging to `main` promotes those manifests to `dev`, where an `infra-dev` application follows the branch automatically.
-
-Local clusters rely on the Rancher `local-path` CSI provisioner (works for both kind and k3d). Staging/prod will migrate to network-attached or SSD-backed PV classes.
-
----
-
-## 6. Local Cluster (3-Node Hybrid)
-
-Nodes:
-1. Linux x86_64 (control-plane + data services affinity).
-2. macOS ARM #1 (GPU candidate, label: `arch=arm64, accelerator=gpu, role=ml`).
-3. macOS ARM #2 (general ARM workloads, label: `arch=arm64, role=general`).
-
-Local simulation uses kind (`config/kind-cluster.yaml` + `scripts/kind_bootstrap.sh`) to spin up a 3-node cluster (1 control-plane, 2 workers) with equivalent scheduling labels applied via `scripts/label_nodes.sh`.
-
-Node Labeling Script: `scripts/label_nodes.sh`
-
-Example Labels Applied:
-| Label | Value |
-|-------|-------|
-| arch | amd64 / arm64 |
-| accelerator | gpu (if available) |
-| role | core | ml | general |
-| zone | local-a |
-
-Taints (optional):
-- `role=core:NoSchedule` for control-plane pref workloads.
-- GPU node toleration for ML pods.
+Override via environment variables or per-environment Makefile includes. Cloud environments load additional variables from Terraform `.tfvars`.
 
 ---
 
-## 7. Kubernetes Layout & Namespaces
-
-| Namespace | Purpose |
-|-----------|---------|
-| kube-system | Control plane (managed) |
-| platform-core | Core services (auth, entitlements, metrics) |
-| data-plane | Data layer (postgres, clickhouse, kafka, redis) |
-| storage | MinIO & related |
-| ml | MLflow, model-serving, embedding/search (when deployed) |
-| ingestion | Airflow / connectors / seatunnel (if running here) |
-| observability | Prometheus, Grafana, Loki (if added), OTel collector |
-| security | Policy controllers, OPA |
-| gatekeeper-system | Gatekeeper controller enforcing admission OPA policies |
-| kyverno | Image signature verification (cosign policy enforcement) |
-| trivy-system | Trivy Operator for runtime & workload vulnerability scanning |
-| backup | Backup jobs & retention logic |
-
-Network Policies: Default deny east-west except required ports & explicit allowances.
+## Operational Checks
+- `scripts/verify.sh` – ensures nodes Ready, critical namespaces active, storage classes available.
+- `scripts/apply_all.sh` – apply manifests sequentially (use with caution; prefer Make targets).
+- `policies/opa/*.rego` – run with `conftest` to enforce pod security (no host networking, restricted capabilities).
+- `scripts/label_nodes.sh` – label nodes for architecture/role (e.g., `platform=control`, `arch=arm64`).
 
 ---
 
-## 8. Core Platform Components
+## Troubleshooting
 
-| Component | Deployment | Storage/PV | Notes |
-|-----------|-----------|------------|-------|
-| PostgreSQL | StatefulSet | 1 × PVC | Transactional metadata |
-| ClickHouse | StatefulSet (single shard early) | 1 × PVC (fast disk preferred) | Time-series + analytics |
-| Redis | Deployment/StatefulSet | Ephemeral ok (dev) | Caching only |
-| Kafka | Single-broker (dev) | 1 × PVC | Zookeeper-less (e.g., Redpanda optional later) |
-| MinIO | StatefulSet | 1 × PVC | MLflow artifacts, backups |
-| Keycloak | Deployment | PVC (postgres external) | Auth provider |
-| MLflow | Deployment | Uses Postgres + MinIO | Tracking |
-| OTel Collector | Deployment | - | Tracing pipeline |
-| Prometheus Stack | Helm chart | PV for TSDB | Metrics |
-| Backup Jobs | CronJob | - | Snapshots to MinIO |
+### Cluster Fails to Bootstrap
+- Check Docker/k3d environment running (`docker ps`, `k3d cluster list`).
+- Inspect bootstrap logs: `cat scripts/kind_bootstrap.sh` output; rerun with `set -x` to debug.
+- Ensure required ports free (kind uses 80/443/6443). Stop conflicting services.
 
----
+### Pods Pending Due to Scheduling
+- `kubectl describe pod <name>` to view taints/affinity issues.
+- Label nodes with `scripts/label_nodes.sh` to satisfy architecture or GPU requirements.
+- Adjust resource requests in `k8s/overlays/<env>/` deployment patches.
 
-## 9. Terraform Module Design
+### PersistentVolume Claims Stuck Pending
+- Verify storage class `standard` exists: `kubectl get storageclass`.
+- For kind, ensure hostPath directories accessible; review `k8s/base/storageclasses/hostpath.yaml`.
+- For k3d/hybrid, confirm Longhorn/NFS or cloud storage provisioner active.
 
-Even for local, modules mimic cloud patterns:
+### Terraform Plan Errors
+- Initialize: `cd terraform/stacks/local && terraform init`.
+- Resolve provider plugins (set `TF_PLUGIN_CACHE_DIR`).
+- Ensure required environment variables set (e.g., cloud credentials) before running plan/apply.
 
-```text
-terraform/modules/
-  k8s_cluster/          # (future: EKS/GKE variant)
-  clickhouse/
-    main.tf
-    variables.tf
-  postgresql/
-  redis/
-  kafka/
-  minio/
-  keycloak/
-  mlflow/
-  observability/
-  storage/
-```
-
-Module Interface Example (clickhouse):
-```hcl
-variable "namespace" { type = string }
-variable "storage_size" { type = string default = "50Gi" }
-variable "replicas" { type = number default = 1 }
-output "service_name" { value = "clickhouse" }
-```
-
-Stacks:
-- `stacks/local` stitches modules + outputs kube YAML.
-- `stacks/hybrid` placeholder for evolving infrastructure (cloud modules + local bridging).
+### Drift Between Git and Cluster
+- `make drift-check` to report differences.
+- For Kustomize drift, inspect `kubectl diff` output and reconcile or patch.
+- For Terraform drift, address resources manually or run `terraform apply` to correct.
 
 ---
 
-## 10. GitOps & Deployment Flow
-
-Two Options (choose one or dual):
-
-| Approach | Tool | Pros | Cons |
-|----------|------|------|------|
-| Push-based | `make apply` + kubectl | Simple, direct | Harder audit |
-| Pull-based (default local/dev) | ArgoCD | Drift detection, rollback, promotion audit trail | Controller + repo credentials required |
-
-Current GitOps workflow (see `docs/gitops-argocd.md` for deep dive):
-1. `make k8s-apply-platform` deploys the platform stack plus ArgoCD (`platform/argocd`).
-2. Application `infra-local` tracks `infra/k8s/overlays/local` at `HEAD`; `infra-dev` (ApplicationSet) tracks `infra/k8s/overlays/dev` at `main`.
-3. Promotion = merge infra changes to `main`; ArgoCD reconciles `infra-dev`. Use `argocd app sync infra-dev` for an immediate rollout.
-
-Access the ArgoCD UI locally:
-```bash
-kubectl -n argocd port-forward svc/argocd-server 8080:443
-argocd login localhost:8080 --username admin --password "$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
-```
-Manual `kubectl apply -k` stays as a breakout lever for experiments or emergency fixes; document any direct changes and backfill them through Git to avoid drift.
-
----
-
-## 11. Secrets & Configuration Management
-
-**SOPS (default)**
-- `.sops.yaml` defines Age-backed creation rules for `secrets/`, `k8s/**/secrets/`, Terraform `*.tfvars`, and the walkthrough assets under `examples/sops/`.
-- Generate your own Age key with `age-keygen -o ~/.config/sops/age/keys.txt` (or reuse an existing team key) and add the public recipient to `.sops.yaml`.
-- `examples/sops/demo.agekey` is a demo-only private key; use it to explore the flow, then replace with your personal key before committing real secrets.
-- Walkthrough manifests live at `examples/sops/demo-secret.plain.yaml` (source) and `examples/sops/demo-secret.enc.yaml` (encrypted). Keep plaintext helpers as `*.plain.yaml` and commit only the encrypted variants.
-- Encrypt new files in place: `cp path/to/secret.yaml path/to/secret.enc.yaml && sops --encrypt --in-place path/to/secret.enc.yaml`.
-- Decrypt with an explicit key file: `SOPS_AGE_KEY_FILE=examples/sops/demo.agekey sops --decrypt examples/sops/demo-secret.enc.yaml`.
-
-**Kubernetes Secrets (bootstrap)**
-- Plain K8s secrets remain available for quick local smoke tests, but they are base64 only—prefer migrating them into SOPS-managed overlays.
-
-**External Secrets (roadmap)**
-- Longer term we will integrate with cloud secret managers via External Secrets Operator once cloud landing zones are ready.
-
-**Helpers**
-- `scripts/rotate_secrets.sh` will re-encrypt all tracked files when recipients change.
-- `secrets/` remains gitignored; never commit production credentials, only encrypted artefacts or `.example` templates.
-
----
-
-## 12. Networking & Ingress Topology
-
-- Ingress Controller: NGINX (initial).
-- (Future) Add MetalLB for LoadBalancer semantics if multi-host.
-- Internal DNS conventions:
-  - `api.local.254carbon` → Gateway
-  - `stream.local.254carbon` → Streaming
-  - `mlflow.local.254carbon` → MLflow
-  - `keycloak.local.254carbon` → Keycloak
-
-TLS (Optional for Local):
-- Self-signed CA via mkcert
-- Cert-manager installation path (future overlay)
-
----
-
-## 13. Storage, Persistence & Data Classes
-
-| Data Type | Storage Class | Retention |
-|-----------|---------------|-----------|
-| ClickHouse primary | fast-local (`rancher.io/local-path`, WaitForFirstConsumer) | 90d raw, TTLs |
-| PostgreSQL metadata | standard-local (`rancher.io/local-path`) | Indefinite (backups) |
-| MinIO artifacts | standard-local (`rancher.io/local-path`) | Configurable lifecycle |
-| Kafka logs | standard-local (`rancher.io/local-path`) | 7d retention (topic-level) |
-| Redis | memory + ephemeral | No persistence required early |
-| Backups | backup-storage (`rancher.io/local-path`, Retain) | MinIO lifecycle rules |
-
-Data tier classification:
-- Tier 0: Critical (Postgres schema & MinIO artifacts, ClickHouse metadata)
-- Tier 1: Recomputable (Cache, Kafka streams)
-- Tier 2: Synthetic (Derived views, projections)
-
-Storage verification (local):
-- `make verify` confirms `standard-local`, `fast-local`, and `backup-storage` are backed by the `rancher.io/local-path` provisioner on both kind and k3d clusters.
-
----
-
-## 14. Backup & Restore Strategy
-
-For the step-by-step operational checklist, see `docs/backup-restore-runbook.md`.
-
-| Component | Backup Method | Frequency | Tooling |
-|-----------|---------------|----------|---------|
-| PostgreSQL | pg_dump (logical) | Daily | CronJob |
-| ClickHouse | `clickhouse-backup` | Daily + retention policy | CronJob (already present style) |
-| MinIO | Versioned bucket (enable) | Continuous | MinIO lifecycle rules |
-| Kafka (optional) | Snapshot export (low priority early) | Manual | Future |
-| MLflow Artifacts | Covered by MinIO | N/A | Same policy |
-
-Restore Steps (Example ClickHouse):
-```bash
-kubectl exec -it clickhouse-0 -- clickhouse-backup list
-kubectl exec -it clickhouse-0 -- clickhouse-backup restore latest
-```
-
-Retention Policy:
-- Keep last 7 daily
-- Keep 4 weekly
-- Keep 3 monthly (configurable in backup CronJob env)
-
-Implementation Notes:
-- CronJobs (`clickhouse-backup`, `postgres-backup`) stream artifacts to MinIO prefixes `backups/<component>/<tier>/`.
-- `minio-backup-maintenance` ensures the `backups` bucket exists, versioning is enabled, and lifecycle rules enforce the tiered retention windows.
-
----
-
-## 15. Observability Integration (Metrics, Logs, Traces)
-
-| Layer | Tool | Notes |
-|-------|------|-------|
-| Metrics | Prometheus + Grafana | K8s cluster + app scraping |
-| Tracing | OpenTelemetry Collector | Exports to Tempo/Jaeger (future) |
-| Logs (future) | Loki / OpenSearch | Structured JSON correlation |
-| Alerts | Alertmanager rules | SLO burn + component readiness |
-
-Metrics Naming Baseline:
-- infra_* (node, cluster)
-- db_* (clickhouse_, postgres_)
-- mq_* (kafka_)
-- objstore_* (minio_)
-- auth_* (keycloak_)
-
----
-
-## 16. Security & Policy Enforcement
-
-Baseline (Local):
-- Pod Security (restricted profile) where possible
-- NetworkPolicies isolate namespaces
-- No privileged pods (except where unavoidable: low-level system components)
-- OPA/Conftest policies (advisory first, enforcing later)
-
-Policies (examples):
-- `deny-excess-privileges.rego`: Block privileged & hostPID/IPC
-- `restrict-hostpath.rego`: Warn/deny unsanctioned hostPath mounts
-- Image registry allowlist: ghcr.io/254carbon/*
-
-Future Additions:
-- gVisor / Kata containers for sandboxed analytics workloads
-- Sigstore cosign verification gates
-
----
-
-## 17. Multi-Arch & Heterogeneous Scheduling
-
-Node Affinity Example (ML Pods → GPU ARM Mac):
-```yaml
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: arch
-              operator: In
-              values: ["arm64"]
-            - key: accelerator
-              operator: In
-              values: ["gpu"]
-```
-
-Tolerations:
-```yaml
-tolerations:
-  - key: "role"
-    operator: "Equal"
-    value: "ml"
-    effect: "NoSchedule"
-```
-
-Images:
-- All application repos publish `linux/amd64,linux/arm64` multi-arch images.
-- Data services (Kafka, ClickHouse) may remain amd64 → pin to Linux node via nodeSelector.
-
----
-
-## 18. Resource Naming & Tagging Conventions
-
-Naming Convention:
-```text
-<system>-<component>-<role>-<suffix>
-```
-Examples:
-- `mi-clickhouse-sts`
-- `mi-postgres-pvc`
-- `ml-embedding-deploy`
-
-Labels:
-| Key | Purpose | Example |
-|-----|---------|---------|
-| app | Component identity | clickhouse |
-| tier | Layer classification | data |
-| domain | Domain grouping | ml / access / ingestion |
-| managed-by | Provisioning tool | terraform / helm / kustomize |
-| version | Release tracking | 1.0.0 |
-
-Annotations:
-- `observability.254carbon.io/scrape: "true"`
-- `security.254carbon.io/profile: restricted`
-- `maintenance.254carbon.io/backup: daily`
-
----
-
-## 19. Automation Scripts & Make Targets
-
-Make Targets (suggested):
-| Target | Action |
-|--------|--------|
-| make k3d-up | Bootstrap k3d multi-node cluster (default) |
-| make k3d-down | Destroy k3d cluster |
-| make kind-up | Bootstrap kind multi-node cluster (alternative) |
-| make kind-down | Destroy kind cluster |
-| make k8s-apply-base | Apply base infra (namespaces, policies) |
-| make k8s-apply-platform | Deploy data + platform components |
-| make verify | Run cluster health + storage verification script |
-| make validate | Render Kustomize overlays, run kubeconform & Conftest, Terraform fmt/validate |
-| make backup-run | Trigger ad-hoc backup jobs |
-| make drift-check | Validate terraform + k8s drift |
-| make clean | Remove temp artifacts |
-
-Scripts:
-- `kind_bootstrap.sh`: Creates kind cluster w/ worker node labels.
-- `k3d_bootstrap.sh`: Alternative k3d cluster bootstrap (mirrors layout).
-- `apply_all.sh`: Ordered apply (base → data → platform).
-- `verify.sh`: Validates storage classes and checks critical endpoints/liveness.
-- `backup_clickhouse.sh`: Manual snapshot invoker.
-- `mirror_mlflow_images.sh`: Mirrors Bitnami MLflow + helper images into `ghcr.io/254carbon/mirror/*` so clusters avoid Docker Hub pulls.
-
----
-
-## 20. CI/CD Pipeline (Infra Changes)
-
-Pipeline Stages:
-1. Lint & Format (Terraform fmt/validate, Kustomize render, kubeconform schema checks)
-2. Security Scan (tfsec, kube-score)
-3. Policy Check (Conftest OPA)
-4. Terraform Plan (for applicable stacks)
-5. Preview Comment (Plan & diff summary)
-6. Manual Approval (for non-local stacks)
-7. Apply (auto for local, gated for future envs)
-8. Post-Apply Drift Snapshot (JSON artifact)
-
-Branch Protections:
-- `main` requires 1 approval + passing policy gates.
-
----
-
-## 21. Drift Detection & Guard Rails
-
-Tools:
-- `terraform plan` scheduled (cron GitHub Action)
-- `kubectl diff` against rendered manifests
-- OPA policies for regression (e.g., addition of privileged pods)
-- Alert on drift (issue auto-created in infra repo)
-
-Example OPA Policy (pseudocode):
-```rego
-deny[msg] {
-  input.kind == "Pod"
-  input.spec.containers[_].securityContext.privileged == true
-  msg = "Privileged pods not allowed"
-}
-```
-
----
-
-## 22. Disaster Recovery & Resilience (Roadmap)
-
-| Item | Current | Target |
-|------|---------|--------|
-| Backups | Logical + ClickHouse snapshot | Multi-copy, off-site |
-| Kafka durability | Single broker | 3+ broker replication |
-| ClickHouse HA | Single node | Replicated shards |
-| Postgres HA | Single primary | Patroni/Crunchy cluster |
-| Object storage | Single MinIO instance | Distributed MinIO set |
-| Multi-region | Not implemented | Active/passive replication |
-
-RPO/RTO (Draft Targets Future):
-- RPO: ≤ 15m (metadata)
-- RTO: ≤ 1h (core services)
-
----
-
-## 23. Cost / Resource Footprint Awareness (Local)
-
-Resource Classes:
-| Component | CPU | Memory | Notes |
-|-----------|-----|--------|------|
-| Postgres | 0.5–1 core | 1–2 Gi | Tune shared buffers ~25% mem |
-| ClickHouse | 1–2 cores | 2–4 Gi | Column compression reduces disk |
-| Kafka | 1 core | 1–2 Gi | Single broker only |
-| MinIO | 0.5–1 core | 512 Mi–1 Gi | Depends on artifact volume |
-| Keycloak | 0.5–1 core | 512 Mi–1 Gi | Enable DB connection pooling |
-| MLflow | 0.25 core | 256–512 Mi | Lightweight |
-| OTel Collector | 0.25 core | 256 Mi | Batch export tuned |
-| Prometheus | 0.5–1 core | 1–2 Gi | Retention trimmed (e.g., 15d) |
-
----
-
-## 24. Future Cloud Migration Blueprint
-
-| Capability | Local Strategy | Cloud Evolution |
-|------------|----------------|-----------------|
-| Cluster | kind/k3d | Managed K8s (EKS/GKE) |
-| Storage | Rancher local-path CSI | EBS / PD / CSI |
-| Secrets | Manual / K8s | AWS/GCP Secret Manager + ExternalSecrets |
-| Ingress | NGINX | Cloud LB + Ingress Controller |
-| Observability | Self-hosted | Managed (CloudWatch / GCP Ops + Tempo/Loki) |
-| Backups | MinIO internal | Cross-region object storage replication |
-| Identity | Keycloak | Keycloak HA / External IdP integration |
-| Terraform backend | Local state | Remote state (S3 + DynamoDB / GCS) |
-| GitOps | ArgoCD | ArgoCD multi-cluster ApplicationSet |
-
----
-
-## 25. Contribution Workflow
-
-1. Create feature branch.
-2. Change infra module / k8s overlays / policies.
-3. Run local validation:
-   ```bash
-   make validate
-   make plan   # (Terraform plan)
-   make k8s-dry-run
-   ```
-4. Open PR (attach plan output).
-5. Address policy & security scan results.
-6. Merge after approval; CI runs apply for `local` (or queue for approval in higher environments).
-
-Commit Message Examples:
-- `feat(clickhouse): add TTL policy for bronze ticks`
-- `chore(observability): increase scrape interval`
-- `fix(keycloak): correct admin svc port`
-
----
-
-## 26. Troubleshooting Matrix
-
-For the full incident triage playbook, see `docs/troubleshooting-runbook.md`.
-
-| Issue | Symptom | Diagnostics | Resolution |
-|-------|---------|-------------|-----------|
-| ClickHouse pod crashloop | Fails on start | `kubectl logs` → config parse error | Validate configmap syntax |
-| Kafka unreachable | Gateway cannot consume | `kubectl exec -it kafka -- kafka-topics --list` | Restart pod / check service DNS |
-| MinIO upload fails | MLflow artifact errors 500 | `kubectl logs minio` | Check access key secret / disk full |
-| Keycloak auth failure | 401 from Auth svc | `curl keycloak:8080/realms/<realm>` | Realm misconfig or Keycloak restart |
-| Prometheus missing metrics | Grafana panels empty | `curl prometheus/api/v1/targets` | Fix ServiceMonitor labels |
-| OPA policy blocking deploy | Apply fails | See admission webhook logs | Adjust policy or add annotation override |
-| Node scheduling failure | Pod Pending | `kubectl describe pod` | Adjust affinity/taints or add node labels |
-
----
-
-## 27. Roadmap
-
-| Milestone | Description | Status |
-|-----------|-------------|--------|
-| M1 | Baseline local cluster automation | In progress |
-| M2 | Policy enforcement (OPA advisory) | Planned |
-| M3 | GitOps introduction (ArgoCD) | In progress (local/dev live) |
-| M4 | HA data services prototype (ClickHouse replicated) | Future |
-| M5 | Observability: full log aggregation (Loki) | Future |
-| M6 | Security scanning integration (Trivy + Cosign) | Future |
-| M7 | Cloud provider overlay modules | Future |
-| M8 | Disaster recovery rehearsal scripts | Future |
-
----
-
-## 28. Changelog Template
-
-```markdown
-## [1.2.0] - 2025-10-08
-### Added
-- clickhouse: TTL for raw ticks (90d)
-- observability: Added OTel Collector config
-
-### Changed
-- kafka: updated retention to 7d
-- postgres: increased shared buffers to 256MB
-
-### Fixed
-- keycloak pvc size mismatch
-
-### Deprecated
-- legacy ingress config (removed in 1.3.0)
-
-### Security
-- OPA policy blocking hostPath usage
-```
-
----
-
-## 29. License / Ownership
-
-- Internal repository until cloud transition.
-- Ownership: Platform Engineering (single developer + AI agents).
-- Future externalization only for neutral Helm charts or generalized Terraform modules (if desired).
-
----
-
-> “Infrastructure should feel like a stable substrate: **predictable**, **observable**, and **quiet**—empowering rapid iteration above it.”
+## Reference
+- `Makefile` – run `make help` for available operations (cluster lifecycle, validation, backups).
+- `terraform/modules/` – reusable modules for data stores, observability, security.
+- `k8s/` – baseline + overlays; integrate with GitOps repo for automated promotion.
+- `scripts/` – utilities for bootstrap, verification, backups, teardown.
+- `policies/opa` – guardrails evaluated by CI and `make validate`.
+
+Consult the [Platform Overview](../PLATFORM_OVERVIEW.md) for environment promotion strategy, shared SLOs, and repository relationships.
