@@ -64,11 +64,6 @@ output "services" {
       port = module.keycloak.service_port
       namespace = module.keycloak.namespace
     }
-    mlflow = {
-      name = module.mlflow.service_name
-      port = module.mlflow.service_port
-      namespace = module.mlflow.namespace
-    }
     prometheus = {
       name = module.observability.prometheus_service_name
       port = module.observability.prometheus_service_port

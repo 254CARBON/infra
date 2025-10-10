@@ -97,13 +97,6 @@ module "keycloak" {
   admin_password = local.keycloak_admin_password
 }
 
-# Deploy MLflow
-module "mlflow" {
-  source = "../../modules/mlflow"
-
-  namespace = module.k8s_cluster.ml_namespace
-  postgres_password = local.postgres_password
-}
 
 # Deploy Observability Stack
 module "observability" {
